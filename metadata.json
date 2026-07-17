@@ -1,0 +1,6 @@
+{
+  "name": "Deen Tok",
+  "description": "Deen Tok is an Islamic short-video and learning community platform focused on beneficial content, Quran, Hadith, and reminders.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

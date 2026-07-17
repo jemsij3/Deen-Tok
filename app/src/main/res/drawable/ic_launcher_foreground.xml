@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Gold Crescent Moon -->
+    <path
+        android:fillColor="#D4AF37"
+        android:pathData="M 38,30 C 24,40 24,68 38,78 C 48,84 62,80 68,72 C 58,74 46,70 42,58 C 38,46 48,36 58,34 C 50,30 42,30 38,30 Z" />
+
+    <!-- Bold letter 'D' in Gold -->
+    <path
+        android:fillColor="#D4AF37"
+        android:pathData="M 47,44 L 54,44 C 58,44 62,47 62,54 C 62,61 58,64 54,64 L 47,64 Z M 51,48 L 51,60 L 54,60 C 56,60 58,58 58,54 C 58,50 56,48 54,48 Z" />
+
+    <!-- Bold letter 'T' in White -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 61,44 L 77,44 L 77,48 L 71,48 L 71,64 L 67,64 L 67,48 L 61,48 Z" />
+
+    <!-- Gold Play Triangle symbol hidden inside 'T' stem -->
+    <path
+        android:fillColor="#D4AF37"
+        android:pathData="M 67,53 L 72,56 L 67,59 Z" />
+
+</vector>
