@@ -11,12 +11,12 @@ plugins {
 
 android {
   namespace = "com.example"
-  compileSdk = 34
+  compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
     applicationId = "com.aistudio.deentok.wqpstx"
     minSdk = 24
-    targetSdk = 34
+    targetSdk = 36
     versionCode = 1
     versionName = "1.0"
 
@@ -44,9 +44,27 @@ android {
       isCrunchPngs = false
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      // signingConfig = signingConfigs.getByName("release")
+      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
+      if (file(keystorePath).exists() || System.getenv("STORE_PASSWORD") != null) {
+        signingConfig = signingConfigs.getByName("release")
+      } else {
+        // Fall back to signing with debug key so it is always signed and installable even on standard systems
+        val localKeystore = file("${rootDir}/debug.keystore")
+        if (localKeystore.exists()) {
+          signingConfig = signingConfigs.getByName("debugConfig")
+        } else {
+          signingConfig = signingConfigs.getByName("debug")
+        }
+      }
     }
-    debug { // signingConfig = signingConfigs.getByName("debugConfig")
+    debug {
+      val localKeystore = file("${rootDir}/debug.keystore")
+      if (localKeystore.exists()) {
+        signingConfig = signingConfigs.getByName("debugConfig")
+      } else {
+        // Fall back to default auto-generated debug key on external systems
+        signingConfig = signingConfigs.getByName("debug")
+      }
     }
   }
   compileOptions {
