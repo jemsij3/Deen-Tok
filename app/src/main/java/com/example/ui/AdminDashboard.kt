@@ -51,6 +51,7 @@ import java.util.*
 
 enum class AdminTab(val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     DASHBOARD("Dashboard", Icons.Default.Home),
+    LIVE_MODERATION("LIVE Streams", Icons.Default.Videocam),
     USERS("Users", Icons.Default.Person),
     CREATORS("Creators", Icons.Default.Face),
     VIDEOS("Videos", Icons.Default.PlayArrow),
@@ -73,7 +74,9 @@ enum class AdminTab(val title: String, val icon: androidx.compose.ui.graphics.ve
 
 @Composable
 fun AdminDashboardScreen(viewModel: DeenTokViewModel) {
-    var isUnlocked by remember { mutableStateOf(false) }
+    var isUnlocked by remember(viewModel.currentUserRole) { 
+        mutableStateOf(viewModel.hasAdminAccess()) 
+    }
 
     if (!isUnlocked) {
         AdminSecurityGate(
@@ -90,15 +93,15 @@ fun AdminSecurityGate(
     onUnlock: () -> Unit,
     viewModel: DeenTokViewModel
 ) {
-    var adminUser by remember { mutableStateOf("@me") }
+    var adminUser by remember { mutableStateOf(viewModel.currentUsername) }
     var adminPasscode by remember { mutableStateOf("") }
     var showError by remember { mutableStateOf(false) }
     var activeField by remember { mutableStateOf(1) } // Default to passcode (1) since user is @me by default
     val focusManager = LocalFocusManager.current
 
     val attemptUnlock = {
-        if (adminPasscode == "admin123" || adminPasscode == "DEENTOK-ADMIN-2026") {
-            viewModel.logAdminAction("LOGIN_SUCCESS", "Admin gateway verified successfully for account: $adminUser")
+        if (viewModel.hasAdminAccess() || adminPasscode == "admin123" || adminPasscode == "DEENTOK-ADMIN-2026") {
+            viewModel.logAdminAction("LOGIN_SUCCESS", "Admin gateway verified successfully for account: ${viewModel.currentUsername}")
             onUnlock()
         } else {
             viewModel.logAdminAction("LOGIN_FAILURE", "Unauthorized login attempt using account name: $adminUser")
@@ -364,12 +367,20 @@ fun AdminSecurityGate(
                     }
 
                     // Row 5: Shift, Space, Backspace, Clear
+                    var lastActionTime by remember { mutableStateOf(0L) }
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Button(
-                            onClick = { isShiftEnabled = !isShiftEnabled },
+                            onClick = { 
+                                val now = System.currentTimeMillis()
+                                if (now - lastActionTime > 150L) {
+                                    lastActionTime = now
+                                    isShiftEnabled = !isShiftEnabled 
+                                }
+                            },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (isShiftEnabled) CyanAccent else SurfaceVariantDark
                             ),
@@ -389,7 +400,11 @@ fun AdminSecurityGate(
 
                         Button(
                             onClick = {
-                                if (activeField == 0) adminUser += " " else adminPasscode += " "
+                                val now = System.currentTimeMillis()
+                                if (now - lastActionTime > 150L) {
+                                    lastActionTime = now
+                                    if (activeField == 0) adminUser += " " else adminPasscode += " "
+                                }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = SurfaceVariantDark),
                             shape = RoundedCornerShape(6.dp),
@@ -403,10 +418,14 @@ fun AdminSecurityGate(
 
                         Button(
                             onClick = {
-                                if (activeField == 0) {
-                                    if (adminUser.isNotEmpty()) adminUser = adminUser.dropLast(1)
-                                } else {
-                                    if (adminPasscode.isNotEmpty()) adminPasscode = adminPasscode.dropLast(1)
+                                val now = System.currentTimeMillis()
+                                if (now - lastActionTime > 150L) {
+                                    lastActionTime = now
+                                    if (activeField == 0) {
+                                        if (adminUser.isNotEmpty()) adminUser = adminUser.dropLast(1)
+                                    } else {
+                                        if (adminPasscode.isNotEmpty()) adminPasscode = adminPasscode.dropLast(1)
+                                    }
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = LikeRed.copy(alpha = 0.2f)),
@@ -464,13 +483,21 @@ fun KeyButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    var lastClickTime by remember { mutableStateOf(0L) }
+
     Box(
         modifier = modifier
             .height(38.dp)
             .clip(RoundedCornerShape(6.dp))
             .background(SurfaceVariantDark)
             .border(0.5.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(6.dp))
-            .clickable(onClick = onClick),
+            .clickable {
+                val now = System.currentTimeMillis()
+                if (now - lastClickTime > 150L) {
+                    lastClickTime = now
+                    onClick()
+                }
+            },
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -505,187 +532,380 @@ fun AdminDashboardMain(viewModel: DeenTokViewModel) {
     val adminNotificationSettings by viewModel.adminNotificationSettings.collectAsState()
     val selectedLanguage by viewModel.selectedLanguage.collectAsState()
 
-    Row(
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val coroutineScope = rememberCoroutineScope()
+
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(Black)
             .statusBarsPadding()
     ) {
-        // Left Panel - Adaptive Sidebar
-        Column(
-            modifier = Modifier
-                .width(260.dp)
-                .fillMaxHeight()
-                .background(SurfaceDark)
-                .padding(vertical = 16.dp, horizontal = 12.dp)
-        ) {
-            // Header Branding
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.padding(bottom = 20.dp, start = 8.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(CyanAccent),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = platformLogoText,
-                        color = Black,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
-                    )
-                }
-                Column {
-                    Text(
-                        text = platformName,
-                        color = TextWhite,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        letterSpacing = 1.sp
-                    )
-                    Text(
-                        text = "System Admin Panel",
-                        color = CyanAccent,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
+        val isMobile = maxWidth < 700.dp
 
-            // Scrollable List of Tabs
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                AdminTab.values().forEach { tab ->
-                    val isSelected = selectedTab == tab
-                    val localizedTitle = tab.getLocalizedTitle(trans)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (isSelected) CyanAccent.copy(alpha = 0.15f) else Color.Transparent)
-                            .clickable { selectedTab = tab }
-                            .padding(vertical = 11.dp, horizontal = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        if (isMobile) {
+            ModalNavigationDrawer(
+                drawerState = drawerState,
+                drawerContent = {
+                    ModalDrawerSheet(
+                        drawerContainerColor = SurfaceDark,
+                        drawerContentColor = TextWhite,
+                        modifier = Modifier.width(280.dp)
                     ) {
-                        Icon(
-                            imageVector = tab.icon,
-                            contentDescription = localizedTitle,
-                            tint = if (isSelected) CyanAccent else TextGray,
-                            modifier = Modifier.size(20.dp)
+                        AdminSidebarContent(
+                            selectedTab = selectedTab,
+                            onTabSelected = { tab ->
+                                selectedTab = tab
+                                coroutineScope.launch { drawerState.close() }
+                            },
+                            platformLogoText = platformLogoText,
+                            platformName = platformName,
+                            trans = trans,
+                            onBackToProfile = { viewModel.setScreen(Screen.PROFILE) }
                         )
-                        Text(
-                            text = localizedTitle,
-                            color = if (isSelected) TextWhite else TextGray,
-                            fontSize = 13.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                    }
+                }
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Black)
+                ) {
+                    // Mobile TopBar Header
+                    Surface(
+                        color = SurfaceDark,
+                        tonalElevation = 4.dp,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                IconButton(
+                                    onClick = { coroutineScope.launch { drawerState.open() } }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Menu,
+                                        contentDescription = "Open Admin Menu",
+                                        tint = CyanAccent
+                                    )
+                                }
+
+                                Column {
+                                    Text(
+                                        text = selectedTab.getLocalizedTitle(trans).uppercase(),
+                                        color = TextWhite,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "$platformName Console",
+                                        color = TextGray,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier
+                                        .background(Black.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .clip(CircleShape)
+                                            .background(CyanAccent)
+                                    )
+                                    Text("LIVE", color = TextWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                IconButton(
+                                    onClick = { viewModel.setScreen(Screen.PROFILE) },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = "Exit to Profile",
+                                        tint = TextWhite,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Content Pane (Mobile Padding)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(12.dp)
+                    ) {
+                        AdminTabRouter(
+                            selectedTab = selectedTab,
+                            viewModel = viewModel,
+                            allVideos = allVideos,
+                            allUsers = allUsers,
+                            allComments = allComments,
+                            allReports = allReports,
+                            allAdvertisements = allAdvertisements,
+                            removedVideos = removedVideos,
+                            allCategories = allCategories,
+                            allAdminLogs = allAdminLogs,
+                            privacySettings = privacySettings,
+                            communityGuidelines = communityGuidelines,
+                            adminNotificationSettings = adminNotificationSettings
                         )
                     }
                 }
             }
+        } else {
+            // Desktop / Tablet Layout
+            Row(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .width(260.dp)
+                        .fillMaxHeight()
+                        .background(SurfaceDark)
+                ) {
+                    AdminSidebarContent(
+                        selectedTab = selectedTab,
+                        onTabSelected = { tab -> selectedTab = tab },
+                        platformLogoText = platformLogoText,
+                        platformName = platformName,
+                        trans = trans,
+                        onBackToProfile = { viewModel.setScreen(Screen.PROFILE) }
+                    )
+                }
 
-            HorizontalDivider(color = Color.White.copy(alpha = 0.05f), modifier = Modifier.padding(vertical = 12.dp))
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .fillMaxHeight()
+                        .background(Color.White.copy(alpha = 0.05f))
+                )
 
-            // Back to App Feed Action
-            Button(
-                onClick = { viewModel.setScreen(Screen.PROFILE) },
-                colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.05f)),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth()
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .padding(24.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = selectedTab.getLocalizedTitle(trans).uppercase(),
+                                color = TextWhite,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 22.sp,
+                                letterSpacing = 1.sp
+                            )
+                            Text(
+                                text = "Real-time SQLite synchronized console",
+                                color = TextGray,
+                                fontSize = 11.sp
+                            )
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier
+                                .background(SurfaceDark, RoundedCornerShape(20.dp))
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(CyanAccent)
+                            )
+                            Text("LIVE FEED", color = TextWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Box(modifier = Modifier.weight(1f)) {
+                        AdminTabRouter(
+                            selectedTab = selectedTab,
+                            viewModel = viewModel,
+                            allVideos = allVideos,
+                            allUsers = allUsers,
+                            allComments = allComments,
+                            allReports = allReports,
+                            allAdvertisements = allAdvertisements,
+                            removedVideos = removedVideos,
+                            allCategories = allCategories,
+                            allAdminLogs = allAdminLogs,
+                            privacySettings = privacySettings,
+                            communityGuidelines = communityGuidelines,
+                            adminNotificationSettings = adminNotificationSettings
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AdminSidebarContent(
+    selectedTab: AdminTab,
+    onTabSelected: (AdminTab) -> Unit,
+    platformLogoText: String,
+    platformName: String,
+    trans: DeenTokTranslations,
+    onBackToProfile: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxHeight()
+            .padding(vertical = 16.dp, horizontal = 12.dp)
+    ) {
+        // Header Branding
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(bottom = 20.dp, start = 8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(CyanAccent),
+                contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Return", tint = TextWhite, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("App Profile", color = TextWhite, fontSize = 12.sp)
+                Text(
+                    text = platformLogoText,
+                    color = Black,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+            }
+            Column {
+                Text(
+                    text = platformName,
+                    color = TextWhite,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    letterSpacing = 1.sp
+                )
+                Text(
+                    text = "System Admin Panel",
+                    color = CyanAccent,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         }
 
-        // Vertical Divider
-        Box(
-            modifier = Modifier
-                .width(1.dp)
-                .fillMaxHeight()
-                .background(Color.White.copy(alpha = 0.05f))
-        )
-
-        // Right Panel - Primary Content Pane (Adaptive)
+        // Scrollable List of Tabs
         Column(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxHeight()
-                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            // Header Content Title
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = selectedTab.getLocalizedTitle(trans).uppercase(),
-                        color = TextWhite,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 22.sp,
-                        letterSpacing = 1.sp
-                    )
-                    Text(
-                        text = "Real-time SQLite synchronized console",
-                        color = TextGray,
-                        fontSize = 11.sp
-                    )
-                }
-                
-                // Real-time status indicator
+            AdminTab.values().forEach { tab ->
+                val isSelected = selectedTab == tab
+                val localizedTitle = tab.getLocalizedTitle(trans)
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier
-                        .background(SurfaceDark, RoundedCornerShape(20.dp))
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isSelected) CyanAccent.copy(alpha = 0.15f) else Color.Transparent)
+                        .clickable { onTabSelected(tab) }
+                        .padding(vertical = 11.dp, horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(CyanAccent)
+                    Icon(
+                        imageVector = tab.icon,
+                        contentDescription = localizedTitle,
+                        tint = if (isSelected) CyanAccent else TextGray,
+                        modifier = Modifier.size(20.dp)
                     )
-                    Text("LIVE FEED", color = TextWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-
-            // Main Tab content Router
-            Box(modifier = Modifier.weight(1f)) {
-                when (selectedTab) {
-                    AdminTab.DASHBOARD -> DashboardTabContent(allVideos, allUsers, allComments, allReports, allAdvertisements)
-                    AdminTab.USERS -> UsersManagementTabContent(allUsers, allVideos, viewModel)
-                    AdminTab.CREATORS -> CreatorsManagementTabContent(allUsers, allVideos, viewModel)
-                    AdminTab.VIDEOS -> VideosManagementTabContent(allVideos, removedVideos, viewModel)
-                    AdminTab.COMMENTS -> CommentsManagementTabContent(allComments, viewModel)
-                    AdminTab.REPORTS -> ReportsManagementTabContent(allReports, viewModel)
-                    AdminTab.CATEGORIES -> CategoriesManagementTabContent(allCategories, viewModel)
-                    AdminTab.HASHTAGS -> HashtagsManagementTabContent(allVideos, viewModel)
-                    AdminTab.ADVERTISEMENTS -> AdvertisementsManagementTabContent(allAdvertisements, viewModel)
-                    AdminTab.TEMPLATES -> TemplatesManagementTabContent(viewModel)
-                    AdminTab.NOTIFICATIONS -> NotificationsManagementTabContent(allAdminLogs, viewModel)
-                    AdminTab.LANGUAGES -> LanguagesManagementTabContent(viewModel)
-                    AdminTab.CONTENT_MODERATION -> ContentModerationTabContent(allVideos, allComments, viewModel)
-                    AdminTab.ANALYTICS -> AnalyticsTabContent(allVideos, allUsers, allComments)
-                    AdminTab.SYSTEM_SETTINGS -> SystemSettingsManagementTabContent(viewModel)
-                    AdminTab.ADMIN_ACCOUNTS -> AdminAccountsTabContent(allUsers, viewModel)
-                    AdminTab.ACTIVITY_LOGS -> ActivityLogsTabContent(allAdminLogs)
-                    AdminTab.BACKUP_RESTORE -> BackupRestoreTabContent(viewModel)
-                    AdminTab.HELP_CENTER -> HelpCenterTabContent()
+                    Text(
+                        text = localizedTitle,
+                        color = if (isSelected) TextWhite else TextGray,
+                        fontSize = 13.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                    )
                 }
             }
         }
+
+        HorizontalDivider(color = Color.White.copy(alpha = 0.05f), modifier = Modifier.padding(vertical = 12.dp))
+
+        // Back to App Feed Action
+        Button(
+            onClick = onBackToProfile,
+            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.05f)),
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Return", tint = TextWhite, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("App Profile", color = TextWhite, fontSize = 12.sp)
+        }
+    }
+}
+
+@Composable
+fun AdminTabRouter(
+    selectedTab: AdminTab,
+    viewModel: DeenTokViewModel,
+    allVideos: List<Video>,
+    allUsers: List<User>,
+    allComments: List<Comment>,
+    allReports: List<Report>,
+    allAdvertisements: List<Advertisement>,
+    removedVideos: List<Video>,
+    allCategories: List<Category>,
+    allAdminLogs: List<AdminLog>,
+    privacySettings: String,
+    communityGuidelines: String,
+    adminNotificationSettings: String
+) {
+    when (selectedTab) {
+        AdminTab.DASHBOARD -> DashboardTabContent(allVideos, allUsers, allComments, allReports, allAdvertisements)
+        AdminTab.LIVE_MODERATION -> LiveModerationTabContent(viewModel)
+        AdminTab.USERS -> UsersManagementTabContent(allUsers, allVideos, viewModel)
+        AdminTab.CREATORS -> CreatorsManagementTabContent(allUsers, allVideos, viewModel)
+        AdminTab.VIDEOS -> VideosManagementTabContent(allVideos, removedVideos, viewModel)
+        AdminTab.COMMENTS -> CommentsManagementTabContent(allComments, viewModel)
+        AdminTab.REPORTS -> ReportsManagementTabContent(allReports, viewModel)
+        AdminTab.CATEGORIES -> CategoriesManagementTabContent(allCategories, viewModel)
+        AdminTab.HASHTAGS -> HashtagsManagementTabContent(allVideos, viewModel)
+        AdminTab.ADVERTISEMENTS -> AdvertisementsManagementTabContent(allAdvertisements, viewModel)
+        AdminTab.TEMPLATES -> TemplatesManagementTabContent(viewModel)
+        AdminTab.NOTIFICATIONS -> NotificationsManagementTabContent(allAdminLogs, viewModel)
+        AdminTab.LANGUAGES -> LanguagesManagementTabContent(viewModel)
+        AdminTab.CONTENT_MODERATION -> ContentModerationTabContent(allVideos, allComments, viewModel)
+        AdminTab.ANALYTICS -> AnalyticsTabContent(allVideos, allUsers, allComments)
+        AdminTab.SYSTEM_SETTINGS -> SystemSettingsManagementTabContent(viewModel)
+        AdminTab.ADMIN_ACCOUNTS -> AdminAccountsTabContent(allUsers, viewModel)
+        AdminTab.ACTIVITY_LOGS -> ActivityLogsTabContent(allAdminLogs)
+        AdminTab.BACKUP_RESTORE -> BackupRestoreTabContent(viewModel)
+        AdminTab.HELP_CENTER -> HelpCenterTabContent()
     }
 }
 
@@ -710,46 +930,57 @@ fun DashboardTabContent(
     val reportsPending = reports.count { it.status == "PENDING" }
     val adsRunning = ads.count { it.status == "ACTIVE" }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Stats Cards Grid
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(160.dp),
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val isMobile = maxWidth < 600.dp
+
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 400.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            item { DashboardCard("Total Users", "$totalUsers", "Registered Users", CyanAccent) }
-            item { DashboardCard("Online Users", "$onlineUsers", "Active Sessions", BlueAccent) }
-            item { DashboardCard("Total Creators", "$totalCreators", "Verified Partners", TextWhite) }
-            item { DashboardCard("Total Videos", "$totalVideos", "System Streams", CyanAccent) }
-            item { DashboardCard("Videos Today", "$videosUploadedToday", "New uploads", BlueAccent) }
-            item { DashboardCard("Total Views", "${totalViews}k", "Accumulated views", TextWhite) }
-            item { DashboardCard("Total Likes", "$totalLikes", "Accumulated reactions", LikeRed) }
-            item { DashboardCard("Total Comments", "$totalComments", "User comments", CyanAccent) }
-            item { DashboardCard("Total Shares", "$totalShares", "Outbound sharing", BlueAccent) }
-            item { DashboardCard("Pending Reports", "$reportsPending", "Action required", LikeRed) }
-            item { DashboardCard("Running Ads", "$adsRunning", "Active campaigns", TextWhite) }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Visual Custom Canvas Charts Row
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Box(modifier = Modifier.weight(1f)) {
-                ChartCard("Platform User Growth", listOf(10f, 25f, 40f, 60f, 85f, 110f, 140f))
+            // Stats Cards Grid
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(if (isMobile) 130.dp else 160.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = if (isMobile) 650.dp else 400.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                item { DashboardCard("Total Users", "$totalUsers", "Registered Users", CyanAccent) }
+                item { DashboardCard("Online Users", "$onlineUsers", "Active Sessions", BlueAccent) }
+                item { DashboardCard("Total Creators", "$totalCreators", "Verified Partners", TextWhite) }
+                item { DashboardCard("Total Videos", "$totalVideos", "System Streams", CyanAccent) }
+                item { DashboardCard("Videos Today", "$videosUploadedToday", "New uploads", BlueAccent) }
+                item { DashboardCard("Total Views", "${totalViews}k", "Accumulated views", TextWhite) }
+                item { DashboardCard("Total Likes", "$totalLikes", "Accumulated reactions", LikeRed) }
+                item { DashboardCard("Total Comments", "$totalComments", "User comments", CyanAccent) }
+                item { DashboardCard("Total Shares", "$totalShares", "Outbound sharing", BlueAccent) }
+                item { DashboardCard("Pending Reports", "$reportsPending", "Action required", LikeRed) }
+                item { DashboardCard("Running Ads", "$adsRunning", "Active campaigns", TextWhite) }
             }
-            Box(modifier = Modifier.weight(1f)) {
-                ChartCard("Daily Content Uploads", listOf(4f, 12f, 8f, 25f, 15f, 32f, 45f))
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Visual Custom Canvas Charts
+            if (isMobile) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    ChartCard("Platform User Growth", listOf(10f, 25f, 40f, 60f, 85f, 110f, 140f))
+                    ChartCard("Daily Content Uploads", listOf(4f, 12f, 8f, 25f, 15f, 32f, 45f))
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        ChartCard("Platform User Growth", listOf(10f, 25f, 40f, 60f, 85f, 110f, 140f))
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        ChartCard("Daily Content Uploads", listOf(4f, 12f, 8f, 25f, 15f, 32f, 45f))
+                    }
+                }
             }
         }
     }
@@ -837,19 +1068,22 @@ fun UsersManagementTabContent(users: List<User>, videos: List<Video>, viewModel:
     ) {
         // Filters Row
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("Search by username...", color = TextGray) },
+                placeholder = { Text("Search by username...", color = TextGray, fontSize = 12.sp) },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = TextWhite, focusedBorderColor = CyanAccent, unfocusedBorderColor = Color.White.copy(alpha = 0.1f)
                 ),
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(8.dp)
+                modifier = Modifier.widthIn(min = 180.dp),
+                shape = RoundedCornerShape(8.dp),
+                singleLine = true
             )
 
             // Role Filters
@@ -869,19 +1103,25 @@ fun UsersManagementTabContent(users: List<User>, videos: List<Video>, viewModel:
             modifier = Modifier.weight(1f).fillMaxWidth(),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                // Table Header
-                Row(
-                    modifier = Modifier.fillMaxWidth().background(Black.copy(alpha = 0.3f)).padding(8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("User Info", color = TextGray, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.5f))
-                    Text("Role", color = TextGray, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                    Text("Status", color = TextGray, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                    Text("Actions", color = TextGray, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(2f), textAlign = TextAlign.End)
-                }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(14.dp)
+                    .horizontalScroll(rememberScrollState())
+            ) {
+                Column(modifier = Modifier.widthIn(min = 550.dp)) {
+                    // Table Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth().background(Black.copy(alpha = 0.3f)).padding(8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("User Info", color = TextGray, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.5f))
+                        Text("Role", color = TextGray, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        Text("Status", color = TextGray, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        Text("Actions", color = TextGray, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(2f), textAlign = TextAlign.End)
+                    }
 
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxSize()) {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxSize()) {
                     items(filteredUsers) { user ->
                         Row(
                             modifier = Modifier
@@ -946,6 +1186,7 @@ fun UsersManagementTabContent(users: List<User>, videos: List<Video>, viewModel:
                 }
             }
         }
+    }
     }
 
     // Edit Profile Dialog
@@ -1117,80 +1358,84 @@ fun CreatorsManagementTabContent(users: List<User>, videos: List<Video>, viewMod
                 Text("Registered Creators", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 Spacer(modifier = Modifier.height(10.dp))
 
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    items(creators) { creator ->
-                        val creatorVideos = videos.filter { it.userId == creator.userId }
-                        val likes = creatorVideos.sumOf { it.likesCount }
-                        val views = creatorVideos.sumOf { it.viewsCount }
+                Box(modifier = Modifier.fillMaxSize().horizontalScroll(rememberScrollState())) {
+                    Column(modifier = Modifier.widthIn(min = 520.dp)) {
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            items(creators) { creator ->
+                                val creatorVideos = videos.filter { it.userId == creator.userId }
+                                val likes = creatorVideos.sumOf { it.likesCount }
+                                val views = creatorVideos.sumOf { it.viewsCount }
 
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .border(0.5.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
-                                .padding(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Text(creator.username, color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                    if (creator.isVerified) {
-                                        Icon(Icons.Default.CheckCircle, "Verified", tint = CyanAccent, modifier = Modifier.size(14.dp))
-                                    }
-                                }
-                                Text("Videos: ${creatorVideos.size}  | Likes: $likes | Views: $views", color = TextGray, fontSize = 11.sp)
-                            }
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Button(
-                                    onClick = { selectedCreatorForAnalytics = creator },
-                                    colors = ButtonDefaults.buttonColors(containerColor = BlueAccent),
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                    modifier = Modifier.height(26.dp)
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .border(0.5.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
+                                        .padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text("Analytics", color = TextWhite, fontSize = 10.sp)
-                                }
+                                    Column {
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Text(creator.username, color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                            if (creator.isVerified) {
+                                                Icon(Icons.Default.CheckCircle, "Verified", tint = CyanAccent, modifier = Modifier.size(14.dp))
+                                            }
+                                        }
+                                        Text("Videos: ${creatorVideos.size}  | Likes: $likes | Views: $views", color = TextGray, fontSize = 11.sp)
+                                    }
 
-                                if (creator.isVerified) {
-                                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        Text(creator.verificationType, color = CyanAccent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
                                         Button(
-                                            onClick = { viewModel.verifyCreator(creator, false) },
-                                            colors = ButtonDefaults.buttonColors(containerColor = LikeRed),
+                                            onClick = { selectedCreatorForAnalytics = creator },
+                                            colors = ButtonDefaults.buttonColors(containerColor = BlueAccent),
                                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                                             modifier = Modifier.height(26.dp)
                                         ) {
-                                            Text("Revoke", color = TextWhite, fontSize = 10.sp)
+                                            Text("Analytics", color = TextWhite, fontSize = 10.sp)
                                         }
-                                    }
-                                } else {
-                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        Button(
-                                            onClick = { viewModel.verifyCreator(creator, true, "Verified Scholar") },
-                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD4AF37)),
-                                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
-                                            modifier = Modifier.height(26.dp)
-                                        ) {
-                                            Text("Scholar 🎓", color = Black, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                        Button(
-                                            onClick = { viewModel.verifyCreator(creator, true, "Islamic Organization") },
-                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
-                                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
-                                            modifier = Modifier.height(26.dp)
-                                        ) {
-                                            Text("Org 🕌", color = TextWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                        Button(
-                                            onClick = { viewModel.verifyCreator(creator, true, "Verified Creator") },
-                                            colors = ButtonDefaults.buttonColors(containerColor = CyanAccent),
-                                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
-                                            modifier = Modifier.height(26.dp)
-                                        ) {
-                                            Text("Creator ✅", color = Black, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+
+                                        if (creator.isVerified) {
+                                            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                Text(creator.verificationType, color = CyanAccent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                                Button(
+                                                    onClick = { viewModel.verifyCreator(creator, false) },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = LikeRed),
+                                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                                    modifier = Modifier.height(26.dp)
+                                                ) {
+                                                    Text("Revoke", color = TextWhite, fontSize = 10.sp)
+                                                }
+                                            }
+                                        } else {
+                                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                Button(
+                                                    onClick = { viewModel.verifyCreator(creator, true, "Verified Scholar") },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD4AF37)),
+                                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                                    modifier = Modifier.height(26.dp)
+                                                ) {
+                                                    Text("Scholar 🎓", color = Black, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                                Button(
+                                                    onClick = { viewModel.verifyCreator(creator, true, "Islamic Organization") },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                                    modifier = Modifier.height(26.dp)
+                                                ) {
+                                                    Text("Org 🕌", color = TextWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                                Button(
+                                                    onClick = { viewModel.verifyCreator(creator, true, "Verified Creator") },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = CyanAccent),
+                                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                                    modifier = Modifier.height(26.dp)
+                                                ) {
+                                                    Text("Creator ✅", color = Black, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -1249,15 +1494,20 @@ fun VideosManagementTabContent(videos: List<Video>, removedVideos: List<Video>, 
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("Search videos by title or description...", color = TextGray) },
+                placeholder = { Text("Search videos...", color = TextGray, fontSize = 12.sp) },
                 colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextWhite, focusedBorderColor = CyanAccent),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.widthIn(min = 180.dp),
+                shape = RoundedCornerShape(8.dp),
+                singleLine = true
             )
 
             FilterDropdown("Category: $selectedCategoryFilter", listOf("ALL", "Tech", "Music", "Cooking", "Lifestyle", "Comedy")) {
@@ -1479,36 +1729,40 @@ fun ReportsManagementTabContent(reports: List<Report>, viewModel: DeenTokViewMod
                 Text("Safety Reports Pending", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 Spacer(modifier = Modifier.height(10.dp))
 
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(reports) { report ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .border(0.5.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
-                                .padding(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column {
-                                Text("Type: ${report.type} | ID: ${report.contentId}", color = CyanAccent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                Text("Reason: ${report.reason}", color = TextWhite, fontSize = 13.sp)
-                                Text("Reported By: ${report.reportedBy} | Status: ${report.status}", color = TextGray, fontSize = 11.sp)
-                            }
+                Box(modifier = Modifier.fillMaxSize().horizontalScroll(rememberScrollState())) {
+                    Column(modifier = Modifier.widthIn(min = 480.dp)) {
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(reports) { report ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .border(0.5.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
+                                        .padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Type: ${report.type} | ID: ${report.contentId}", color = CyanAccent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                        Text("Reason: ${report.reason}", color = TextWhite, fontSize = 13.sp)
+                                        Text("Reported By: ${report.reportedBy} | Status: ${report.status}", color = TextGray, fontSize = 11.sp)
+                                    }
 
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Button(
-                                    onClick = { viewModel.resolveReport(report, "RESOLVED_REMOVED") },
-                                    colors = ButtonDefaults.buttonColors(containerColor = LikeRed),
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                                ) {
-                                    Text("Remove Content", color = TextWhite, fontSize = 10.sp)
-                                }
-                                Button(
-                                    onClick = { viewModel.resolveReport(report, "CLOSED") },
-                                    colors = ButtonDefaults.buttonColors(containerColor = SurfaceVariantDark),
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                                ) {
-                                    Text("Close", color = TextWhite, fontSize = 10.sp)
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Button(
+                                            onClick = { viewModel.resolveReport(report, "RESOLVED_REMOVED") },
+                                            colors = ButtonDefaults.buttonColors(containerColor = LikeRed),
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                        ) {
+                                            Text("Remove Content", color = TextWhite, fontSize = 10.sp)
+                                        }
+                                        Button(
+                                            onClick = { viewModel.resolveReport(report, "CLOSED") },
+                                            colors = ButtonDefaults.buttonColors(containerColor = SurfaceVariantDark),
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                        ) {
+                                            Text("Close", color = TextWhite, fontSize = 10.sp)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1537,16 +1791,19 @@ fun CategoriesManagementTabContent(categories: List<Category>, viewModel: DeenTo
             Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Create Category", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedTextField(
                         value = newCatName,
                         onValueChange = { newCatName = it },
-                        placeholder = { Text("Category Name...", color = TextGray) },
+                        placeholder = { Text("Category Name...", color = TextGray, fontSize = 12.sp) },
                         colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextWhite, focusedBorderColor = CyanAccent),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.widthIn(min = 160.dp),
+                        singleLine = true
                     )
                     
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1933,23 +2190,33 @@ fun AnalyticsTabContent(videos: List<Video>, users: List<User>, comments: List<C
     val totalViews = videos.sumOf { it.viewsCount }
     val totalLikes = videos.sumOf { it.likesCount }
     
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val isMobile = maxWidth < 600.dp
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Box(modifier = Modifier.weight(1f)) {
-                DashboardCard("Platform Views", "${totalViews}k", "Accumulated platform traffic", CyanAccent)
+            if (isMobile) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    DashboardCard("Platform Views", "${totalViews}k", "Accumulated platform traffic", CyanAccent)
+                    DashboardCard("Reaction Engagement", "$totalLikes", "Likes counter metric", LikeRed)
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        DashboardCard("Platform Views", "${totalViews}k", "Accumulated platform traffic", CyanAccent)
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        DashboardCard("Reaction Engagement", "$totalLikes", "Likes counter metric", LikeRed)
+                    }
+                }
             }
-            Box(modifier = Modifier.weight(1f)) {
-                DashboardCard("Reaction Engagement", "$totalLikes", "Likes counter metric", LikeRed)
-            }
-        }
 
         Spacer(modifier = Modifier.height(6.dp))
 
@@ -1974,6 +2241,7 @@ fun AnalyticsTabContent(videos: List<Video>, users: List<User>, comments: List<C
             }
         }
     }
+}
 }
 
 // ==================== 14. SYSTEM SETTINGS ====================
@@ -2727,3 +2995,378 @@ fun FlowRow(
         content = { content() }
     )
 }
+
+@Composable
+fun LiveModerationTabContent(viewModel: DeenTokViewModel) {
+    val activeLiveStreams by viewModel.activeLiveStreams.collectAsState()
+    val allLiveReports by viewModel.allLiveReports.collectAsState()
+    val isLiveFeatureEnabled by viewModel.isLiveFeatureEnabled.collectAsState()
+    val minFollowersForLive by viewModel.minFollowersForLive.collectAsState()
+    val liveBannedUserIds by viewModel.liveBannedUserIds.collectAsState()
+    val context = LocalContext.current
+    var selectedStreamForEnding by remember { mutableStateOf<LiveStream?>(null) }
+    var broadcastMessage by remember { mutableStateOf("") }
+    var banUsernameInput by remember { mutableStateOf("") }
+    var minFollowersInput by remember { mutableStateOf(minFollowersForLive.toString()) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Administrative LIVE Settings & Eligibility Controls
+        Card(
+            colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("🔴 LIVE FEATURE & ELIGIBILITY SETTINGS", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+
+                // Global Enable/Disable Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Enable LIVE Feature Globally", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text("When turned off, creators cannot start new live streams", color = TextGray, fontSize = 10.sp)
+                    }
+                    Switch(
+                        checked = isLiveFeatureEnabled,
+                        onCheckedChange = { viewModel.setLiveFeatureEnabled(it) },
+                        colors = SwitchDefaults.colors(checkedTrackColor = CyanAccent)
+                    )
+                }
+
+                Divider(color = SurfaceVariantDark, thickness = 0.5.dp)
+
+                // Minimum Followers Configuration
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Minimum Follower Requirement", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = minFollowersInput,
+                            onValueChange = { minFollowersInput = it },
+                            placeholder = { Text("0") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextWhite, focusedBorderColor = CyanAccent, unfocusedBorderColor = SurfaceVariantDark)
+                        )
+                        Button(
+                            onClick = {
+                                val count = minFollowersInput.toIntOrNull() ?: 0
+                                viewModel.setMinFollowersForLive(count)
+                                android.widget.Toast.makeText(context, "Minimum followers set to $count", android.widget.Toast.LENGTH_SHORT).show()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = CyanAccent)
+                        ) {
+                            Text("Save Requirement", color = Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Ban / Restriction Management Card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("🚫 LIVE RESTRICTIONS & BAN MANAGEMENT", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = banUsernameInput,
+                        onValueChange = { banUsernameInput = it },
+                        placeholder = { Text("Enter Username or User ID (e.g. @violator_user)", color = TextMuted) },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextWhite, focusedBorderColor = LikeRed, unfocusedBorderColor = SurfaceVariantDark)
+                    )
+                    Button(
+                        onClick = {
+                            if (banUsernameInput.isNotBlank()) {
+                                viewModel.banUserFromLive(banUsernameInput, banUsernameInput)
+                                android.widget.Toast.makeText(context, "Restricted $banUsernameInput from LIVE", android.widget.Toast.LENGTH_SHORT).show()
+                                banUsernameInput = ""
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = LikeRed)
+                    ) {
+                        Text("Restrict", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    }
+                }
+
+                if (liveBannedUserIds.isNotEmpty()) {
+                    Text("Currently Restricted Accounts:", color = TextGray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(liveBannedUserIds.toList()) { bannedId ->
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(SurfaceVariantDark)
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(bannedId, color = TextWhite, fontSize = 11.sp)
+                                    Text(
+                                        "✕",
+                                        color = LikeRed,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.clickable {
+                                            viewModel.unbanUserFromLive(bannedId, bannedId)
+                                            android.widget.Toast.makeText(context, "Unbanned $bannedId", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // System Header Stat Card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(LikeRed)
+                    )
+                    Text("ACTIVE LIVE STREAMS MONITORING", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+                Text("Real-time content supervision, stream termination control, and host policy moderation.", color = TextGray, fontSize = 11.sp)
+            }
+        }
+
+        // Active Live Streams List
+        if (activeLiveStreams.isEmpty()) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                modifier = Modifier.fillMaxWidth().height(140.dp)
+            ) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No ongoing LIVE streams currently active.", color = TextGray, fontSize = 12.sp)
+                }
+            }
+        } else {
+            activeLiveStreams.forEach { stream ->
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(DarkNavy),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(stream.creatorUsername.take(2).uppercase(), color = CyanAccent, fontWeight = FontWeight.Bold)
+                                }
+                                Column {
+                                    Text(stream.title, color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    Text("Host: ${stream.creatorUsername} • Category: ${stream.category}", color = TextGray, fontSize = 11.sp)
+                                }
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(LikeRed)
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text("LIVE • ${stream.viewerCount} Viewers", color = TextWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Total Gifts Received: 🪙 ${stream.giftCoinsEarned} DT Coins", color = GoldYellow, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = {
+                                        viewModel.selectLiveStream(stream.id)
+                                        viewModel.setScreen(Screen.LIVE)
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = SurfaceVariantDark)
+                                ) {
+                                    Text("Inspect Stream", color = CyanAccent, fontSize = 10.sp)
+                                }
+
+                                Button(
+                                    onClick = { selectedStreamForEnding = stream },
+                                    colors = ButtonDefaults.buttonColors(containerColor = LikeRed)
+                                ) {
+                                    Text("Terminate Stream", color = TextWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Administrative Global Warning / Broadcast Section
+        Card(
+            colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("ADMINISTRATIVE LIVE BROADCAST ALERT", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                OutlinedTextField(
+                    value = broadcastMessage,
+                    onValueChange = { broadcastMessage = it },
+                    placeholder = { Text("Enter message to broadcast to all active live chat streams...", color = TextMuted, fontSize = 12.sp) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextWhite, focusedBorderColor = CyanAccent, unfocusedBorderColor = SurfaceVariantDark)
+                )
+
+                Button(
+                    onClick = {
+                        if (broadcastMessage.isNotBlank()) {
+                            activeLiveStreams.forEach { st ->
+                                viewModel.sendLiveChatMessage(st.id, "📢 [ADMIN SYSTEM]: $broadcastMessage")
+                            }
+                            android.widget.Toast.makeText(context, "Broadcast sent to all active live streams!", android.widget.Toast.LENGTH_SHORT).show()
+                            broadcastMessage = ""
+                        }
+                    },
+                    modifier = Modifier.align(Alignment.End),
+                    colors = ButtonDefaults.buttonColors(containerColor = CyanAccent)
+                ) {
+                    Text("Send Broadcast", color = Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                }
+            }
+        }
+
+        // LIVE Stream User Reports Inspection Section
+        Card(
+            colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("🚩 LIVE STREAM USER REPORTS & AUDIT", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+
+                if (allLiveReports.isEmpty()) {
+                    Text("No live stream reports logged.", color = TextMuted, fontSize = 11.sp)
+                } else {
+                    allLiveReports.forEach { report ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(SurfaceVariantDark, RoundedCornerShape(8.dp))
+                                .padding(12.dp)
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Report #${report.id} • Stream #${report.streamId}", color = CyanAccent, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(if (report.status == "PENDING") GoldYellow else SurfaceDark)
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(report.status, color = if (report.status == "PENDING") Black else TextWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+
+                                Text("Reason: ${report.reason}", color = TextWhite, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                Text("Reported User: ${report.reportedUsername} • Reporter: ${report.reporterUsername}", color = TextGray, fontSize = 10.sp)
+
+                                if (report.status == "PENDING") {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.align(Alignment.End)
+                                    ) {
+                                        TextButton(onClick = { viewModel.reviewLiveReport(report.id, "DISMISSED") }) {
+                                            Text("Dismiss", color = TextGray, fontSize = 10.sp)
+                                        }
+                                        Button(
+                                            onClick = {
+                                                viewModel.reviewLiveReport(report.id, "ACTIONED")
+                                                viewModel.adminEndLiveStream(report.streamId, "Reported for: ${report.reason}")
+                                                android.widget.Toast.makeText(context, "Stream #${report.streamId} suspended", android.widget.Toast.LENGTH_SHORT).show()
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = LikeRed)
+                                        ) {
+                                            Text("Suspend Stream", color = TextWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Terminate Stream Confirmation Modal
+    if (selectedStreamForEnding != null) {
+        val streamToClose = selectedStreamForEnding!!
+        AlertDialog(
+            onDismissRequest = { selectedStreamForEnding = null },
+            title = { Text("Terminate LIVE Stream", color = TextWhite, fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "Are you sure you want to forcibly terminate '${streamToClose.title}' hosted by ${streamToClose.creatorUsername}? This will close the broadcast immediately for all viewers.",
+                    color = TextGray,
+                    fontSize = 12.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.endLiveStream(streamToClose.id)
+                        viewModel.logAdminAction("LIVE_TERMINATE", "Terminated live stream ${streamToClose.id} hosted by ${streamToClose.creatorUsername}")
+                        android.widget.Toast.makeText(context, "Stream terminated successfully.", android.widget.Toast.LENGTH_SHORT).show()
+                        selectedStreamForEnding = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = LikeRed)
+                ) {
+                    Text("Terminate Now", color = TextWhite, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { selectedStreamForEnding = null }) {
+                    Text("Cancel", color = TextGray)
+                }
+            },
+            containerColor = SurfaceDark
+        )
+    }
+}
+

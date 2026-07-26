@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.firstOrNull
 class DeenTokRepository(private val deenTokDao: DeenTokDao) {
 
     val allVideos: Flow<List<Video>> = deenTokDao.getAllVideos()
+    fun getVideoById(videoId: Int): Flow<Video?> = deenTokDao.getVideoById(videoId)
     val allMessages: Flow<List<Message>> = deenTokDao.getAllMessages()
     val allNotifications: Flow<List<Notification>> = deenTokDao.getAllNotifications()
     val allUsers: Flow<List<User>> = deenTokDao.getAllUsers()
@@ -14,6 +15,75 @@ class DeenTokRepository(private val deenTokDao: DeenTokDao) {
     val allReports: Flow<List<Report>> = deenTokDao.getAllReports()
     val allAdvertisements: Flow<List<Advertisement>> = deenTokDao.getAllAdvertisements()
     val allAdminLogs: Flow<List<AdminLog>> = deenTokDao.getAllAdminLogs()
+
+    // --- DT COIN & GIFT ECONOMY FLOWS ---
+    val allCoinPackages: Flow<List<CoinPackage>> = deenTokDao.getAllCoinPackages()
+    val allVirtualGifts: Flow<List<VirtualGift>> = deenTokDao.getAllVirtualGifts()
+    val allPaymentTransactions: Flow<List<PaymentTransaction>> = deenTokDao.getAllPaymentTransactions()
+    val allGiftTransactions: Flow<List<GiftTransaction>> = deenTokDao.getAllGiftTransactions()
+    val allWithdrawalRequests: Flow<List<WithdrawalRequest>> = deenTokDao.getAllWithdrawalRequests()
+    val allCoinTransactions: Flow<List<CoinTransaction>> = deenTokDao.getAllCoinTransactions()
+
+    fun getUserWallet(userId: String): Flow<UserWallet?> = deenTokDao.getUserWallet(userId)
+    fun getUserPaymentTransactions(userId: String): Flow<List<PaymentTransaction>> = deenTokDao.getUserPaymentTransactions(userId)
+    fun getUserCoinTransactions(userId: String): Flow<List<CoinTransaction>> = deenTokDao.getUserCoinTransactions(userId)
+    fun getCreatorWallet(userId: String): Flow<CreatorWallet?> = deenTokDao.getCreatorWallet(userId)
+    fun getCreatorGiftTransactions(creatorId: String): Flow<List<GiftTransaction>> = deenTokDao.getCreatorGiftTransactions(creatorId)
+    fun getUserWithdrawalRequests(userId: String): Flow<List<WithdrawalRequest>> = deenTokDao.getUserWithdrawalRequests(userId)
+
+    suspend fun insertOrUpdateUserWallet(wallet: UserWallet) = deenTokDao.insertOrUpdateUserWallet(wallet)
+
+    suspend fun insertCoinPackage(pkg: CoinPackage) = deenTokDao.insertCoinPackage(pkg)
+    suspend fun updateCoinPackage(pkg: CoinPackage) = deenTokDao.updateCoinPackage(pkg)
+    suspend fun deleteCoinPackage(pkg: CoinPackage) = deenTokDao.deleteCoinPackage(pkg)
+
+    suspend fun insertPaymentTransaction(tx: PaymentTransaction): Long = deenTokDao.insertPaymentTransaction(tx)
+    suspend fun updatePaymentTransaction(tx: PaymentTransaction) = deenTokDao.updatePaymentTransaction(tx)
+
+    suspend fun insertCoinTransaction(tx: CoinTransaction) = deenTokDao.insertCoinTransaction(tx)
+
+    suspend fun insertVirtualGift(gift: VirtualGift) = deenTokDao.insertVirtualGift(gift)
+    suspend fun updateVirtualGift(gift: VirtualGift) = deenTokDao.updateVirtualGift(gift)
+    suspend fun deleteVirtualGift(gift: VirtualGift) = deenTokDao.deleteVirtualGift(gift)
+
+    suspend fun insertGiftTransaction(tx: GiftTransaction): Long = deenTokDao.insertGiftTransaction(tx)
+
+    suspend fun insertOrUpdateCreatorWallet(wallet: CreatorWallet) = deenTokDao.insertOrUpdateCreatorWallet(wallet)
+
+    suspend fun insertWithdrawalRequest(req: WithdrawalRequest): Long = deenTokDao.insertWithdrawalRequest(req)
+    suspend fun updateWithdrawalRequest(req: WithdrawalRequest) = deenTokDao.updateWithdrawalRequest(req)
+
+
+    // --- LIVE STREAMING FLOWS & REPOSITORY METHODS ---
+    val activeLiveStreams: Flow<List<LiveStream>> = deenTokDao.getActiveLiveStreams()
+    val allLiveStreams: Flow<List<LiveStream>> = deenTokDao.getAllLiveStreams()
+    val allLiveReports: Flow<List<LiveReport>> = deenTokDao.getAllLiveReports()
+
+    fun getLiveStreamById(streamId: Int): Flow<LiveStream?> = deenTokDao.getLiveStreamById(streamId)
+    suspend fun getActiveLiveStreamByCreator(userId: String): LiveStream? = deenTokDao.getActiveLiveStreamByCreator(userId)
+    suspend fun insertLiveStream(stream: LiveStream): Long = deenTokDao.insertLiveStream(stream)
+    suspend fun updateLiveStream(stream: LiveStream) = deenTokDao.updateLiveStream(stream)
+    suspend fun deleteLiveStreamById(streamId: Int) = deenTokDao.deleteLiveStreamById(streamId)
+
+    fun getLiveChatMessages(streamId: Int): Flow<List<LiveChatMessage>> = deenTokDao.getLiveChatMessages(streamId)
+    suspend fun insertLiveChatMessage(msg: LiveChatMessage): Long = deenTokDao.insertLiveChatMessage(msg)
+    suspend fun updateLiveChatMessage(msg: LiveChatMessage) = deenTokDao.updateLiveChatMessage(msg)
+    suspend fun deleteLiveChatMessage(messageId: Int) = deenTokDao.deleteLiveChatMessage(messageId)
+
+    fun getLiveViewers(streamId: Int): Flow<List<LiveViewer>> = deenTokDao.getLiveViewers(streamId)
+    suspend fun insertOrUpdateLiveViewer(viewer: LiveViewer): Long = deenTokDao.insertOrUpdateLiveViewer(viewer)
+    suspend fun removeLiveViewer(streamId: Int, userId: String) = deenTokDao.removeLiveViewer(streamId, userId)
+
+    fun getLiveModerators(streamId: Int): Flow<List<LiveModerator>> = deenTokDao.getLiveModerators(streamId)
+    suspend fun insertLiveModerator(mod: LiveModerator) = deenTokDao.insertLiveModerator(mod)
+    suspend fun removeLiveModerator(streamId: Int, userId: String) = deenTokDao.removeLiveModerator(streamId, userId)
+
+    suspend fun insertLiveReport(report: LiveReport): Long = deenTokDao.insertLiveReport(report)
+    suspend fun updateLiveReport(report: LiveReport) = deenTokDao.updateLiveReport(report)
+
+    fun getLiveAnalytics(streamId: Int): Flow<LiveAnalytics?> = deenTokDao.getLiveAnalytics(streamId)
+    suspend fun insertOrUpdateLiveAnalytics(analytics: LiveAnalytics) = deenTokDao.insertOrUpdateLiveAnalytics(analytics)
+
 
     suspend fun insertUser(user: User) {
         deenTokDao.insertUser(user)
@@ -439,5 +509,135 @@ class DeenTokRepository(private val deenTokDao: DeenTokDao) {
                 )
             )
         }
+
+        // --- PREPOPULATE DT COIN PACKAGES ---
+        val packages = deenTokDao.getAllCoinPackages().first()
+        if (packages.isEmpty()) {
+            val defaultPackages = listOf(
+                CoinPackage(id = "pkg_starter", title = "Starter Package", coinAmount = 100, bonusAmount = 0, priceEtb = 50.0, badge = "Starter"),
+                CoinPackage(id = "pkg_popular", title = "Popular Package", coinAmount = 500, bonusAmount = 50, priceEtb = 250.0, badge = "Most Popular"),
+                CoinPackage(id = "pkg_premium", title = "Premium Package", coinAmount = 1200, bonusAmount = 200, priceEtb = 500.0, badge = "Best Value"),
+                CoinPackage(id = "pkg_vip", title = "VIP Package", coinAmount = 3000, bonusAmount = 600, priceEtb = 1000.0, badge = "VIP Gold")
+            )
+            for (p in defaultPackages) {
+                deenTokDao.insertCoinPackage(p)
+            }
+        }
+
+        // --- PREPOPULATE VIRTUAL GIFTS ---
+        val existingGifts = deenTokDao.getAllVirtualGifts().first()
+        val existingNames = existingGifts.map { it.name.trim().lowercase() }.toSet()
+
+        val defaultGifts = listOf(
+            VirtualGift(id = "gift_rose", name = "Rose", category = "BASIC", coinPrice = 5, iconSymbol = "🌹", animationType = "FLOAT_BURST"),
+            VirtualGift(id = "gift_star", name = "Star", category = "BASIC", coinPrice = 10, iconSymbol = "⭐", animationType = "SPARKLE_BURST"),
+            VirtualGift(id = "gift_heart", name = "Heart", category = "BASIC", coinPrice = 20, iconSymbol = "❤️", animationType = "HEART_FLY"),
+            VirtualGift(id = "gift_crescent", name = "Crescent Moon", category = "BASIC", coinPrice = 35, iconSymbol = "🌙", animationType = "MOON_GLOW"),
+            VirtualGift(id = "gift_scroll", name = "Quran Scroll", category = "SPECIAL", coinPrice = 100, iconSymbol = "📜", animationType = "GOLDEN_EXPAND"),
+            VirtualGift(id = "gift_lantern", name = "Fanous Lantern", category = "SPECIAL", coinPrice = 250, iconSymbol = "🏮", animationType = "LANTERN_LIGHT"),
+            VirtualGift(id = "gift_minaret", name = "Gold Minaret", category = "SPECIAL", coinPrice = 500, iconSymbol = "🕌", animationType = "MINARET_BEAM"),
+            VirtualGift(id = "gift_kaaba", name = "Kaaba Model", category = "PREMIUM", coinPrice = 1000, iconSymbol = "🕋", animationType = "KAABA_LIGHT"),
+            VirtualGift(id = "gift_crown", name = "Royal Crown", category = "PREMIUM", coinPrice = 2500, iconSymbol = "👑", animationType = "CROWN_ROYAL"),
+            VirtualGift(id = "gift_light", name = "Light of Deen", category = "PREMIUM", coinPrice = 5000, iconSymbol = "✨", animationType = "LIGHT_BEAM"),
+
+            // 54 DeenTok Virtual Gifts
+            VirtualGift(id = "gift_jannah_pearl", name = "Jannah Pearl", category = "BASIC", coinPrice = 1, iconSymbol = "🌼", animationType = "PEARL_GLOW"),
+            VirtualGift(id = "gift_rayyan_rose", name = "Rayyan Rose", category = "BASIC", coinPrice = 2, iconSymbol = "🌹", animationType = "ROSE_BLOOM"),
+            VirtualGift(id = "gift_hilal", name = "Hilal", category = "BASIC", coinPrice = 3, iconSymbol = "🌙", animationType = "CRESCENT_SWIRL"),
+            VirtualGift(id = "gift_najm", name = "Najm", category = "BASIC", coinPrice = 4, iconSymbol = "⭐", animationType = "STAR_SPARKLE"),
+            VirtualGift(id = "gift_ihsan_leaf", name = "Ihsan Leaf", category = "BASIC", coinPrice = 5, iconSymbol = "🌿", animationType = "LEAF_DRIFT"),
+            VirtualGift(id = "gift_aman_dove", name = "Aman Dove", category = "BASIC", coinPrice = 6, iconSymbol = "🕊️", animationType = "DOVE_FLIGHT"),
+            VirtualGift(id = "gift_jannah_blossom", name = "Jannah Blossom", category = "BASIC", coinPrice = 7, iconSymbol = "🌸", animationType = "BLOSSOM_PETALS"),
+            VirtualGift(id = "gift_rahmah", name = "Rahmah", category = "BASIC", coinPrice = 8, iconSymbol = "🌧️", animationType = "RAIN_SHOWER"),
+            VirtualGift(id = "gift_noor", name = "Noor", category = "BASIC", coinPrice = 9, iconSymbol = "🌟", animationType = "NOOR_RADIANCE"),
+            VirtualGift(id = "gift_sidrah", name = "Sidrah", category = "BASIC", coinPrice = 10, iconSymbol = "🌿", animationType = "TREE_BRANCH_GLOW"),
+            VirtualGift(id = "gift_sidq_crystal", name = "Sidq Crystal", category = "BASIC", coinPrice = 15, iconSymbol = "💎", animationType = "CRYSTAL_SHINE"),
+            VirtualGift(id = "gift_bashir_star", name = "Bashir Star", category = "BASIC", coinPrice = 20, iconSymbol = "⭐", animationType = "STAR_BURST"),
+            VirtualGift(id = "gift_qamar_light", name = "Qamar Light", category = "BASIC", coinPrice = 25, iconSymbol = "🌙", animationType = "MOONBEAM_GLOW"),
+            VirtualGift(id = "gift_naim_blossom", name = "Naim Blossom", category = "BASIC", coinPrice = 30, iconSymbol = "🌺", animationType = "FLOWER_POP"),
+            VirtualGift(id = "gift_rayan_palm", name = "Rayan Palm", category = "BASIC", coinPrice = 40, iconSymbol = "🌴", animationType = "PALM_SWAY"),
+            VirtualGift(id = "gift_dhikr_light", name = "Dhikr Light", category = "BASIC", coinPrice = 50, iconSymbol = "💫", animationType = "SPIRAL_LIGHT"),
+            VirtualGift(id = "gift_husn_flower", name = "Husn Flower", category = "BASIC", coinPrice = 60, iconSymbol = "🌸", animationType = "PETAL_FLUTTER"),
+            VirtualGift(id = "gift_amin_heart", name = "Amin Heart", category = "BASIC", coinPrice = 70, iconSymbol = "💚", animationType = "HEART_PULSE"),
+            VirtualGift(id = "gift_tawakkul_branch", name = "Tawakkul Branch", category = "BASIC", coinPrice = 80, iconSymbol = "🌿", animationType = "GOLDEN_LEAVES"),
+            VirtualGift(id = "gift_furqan_star", name = "Furqan Star", category = "BASIC", coinPrice = 90, iconSymbol = "⭐", animationType = "STAR_BEAM"),
+            VirtualGift(id = "gift_shukr_sunrise", name = "Shukr Sunrise", category = "SPECIAL", coinPrice = 100, iconSymbol = "🌅", animationType = "SUNRISE_GLOW"),
+            VirtualGift(id = "gift_adl_gem", name = "Adl Gem", category = "SPECIAL", coinPrice = 120, iconSymbol = "💎", animationType = "GEM_PRISM"),
+            VirtualGift(id = "gift_ghayth_rain", name = "Ghayth Rain", category = "SPECIAL", coinPrice = 150, iconSymbol = "🌧️", animationType = "GOLDEN_RAIN"),
+            VirtualGift(id = "gift_wudd_dove", name = "Wudd Dove", category = "SPECIAL", coinPrice = 180, iconSymbol = "🕊️", animationType = "DOVE_PAIR_FLIGHT"),
+            VirtualGift(id = "gift_tayyib_blossom", name = "Tayyib Blossom", category = "SPECIAL", coinPrice = 200, iconSymbol = "🌺", animationType = "BLOSSOM_CASCADE"),
+            VirtualGift(id = "gift_basirah_light", name = "Basirah Light", category = "SPECIAL", coinPrice = 250, iconSymbol = "🌟", animationType = "AURA_PULSE"),
+            VirtualGift(id = "gift_yusr_moon", name = "Yusr Moon", category = "SPECIAL", coinPrice = 300, iconSymbol = "🌙", animationType = "FULL_MOON_SHINE"),
+            VirtualGift(id = "gift_khayr_garden", name = "Khayr Garden", category = "SPECIAL", coinPrice = 400, iconSymbol = "🌿", animationType = "GARDEN_BLOOM"),
+            VirtualGift(id = "gift_ihsan_crystal", name = "Ihsan Crystal", category = "SPECIAL", coinPrice = 500, iconSymbol = "💎", animationType = "DIAMOND_EXPLOSION"),
+            VirtualGift(id = "gift_jood_flower", name = "Jood Flower", category = "SPECIAL", coinPrice = 600, iconSymbol = "🌸", animationType = "FLOWER_SHOWER"),
+            VirtualGift(id = "gift_amal_star", name = "Amal Star", category = "SPECIAL", coinPrice = 700, iconSymbol = "⭐", animationType = "SHOOTING_STAR"),
+            VirtualGift(id = "gift_ukhuwwah_dove", name = "Ukhuwwah Dove", category = "SPECIAL", coinPrice = 800, iconSymbol = "🕊️", animationType = "DOVE_AURORA"),
+            VirtualGift(id = "gift_salam_garden", name = "Salam Garden", category = "SPECIAL", coinPrice = 900, iconSymbol = "🌴", animationType = "PALM_OASIS_GLOW"),
+            VirtualGift(id = "gift_bashair_light", name = "Basha'ir Light", category = "PREMIUM", coinPrice = 1000, iconSymbol = "💫", animationType = "COSMIC_LIGHT"),
+            VirtualGift(id = "gift_nur_blossom", name = "Nur Blossom", category = "PREMIUM", coinPrice = 1500, iconSymbol = "🌺", animationType = "GOLDEN_NUR_BLOOM"),
+            VirtualGift(id = "gift_falah_sunrise", name = "Falah Sunrise", category = "PREMIUM", coinPrice = 2000, iconSymbol = "🌅", animationType = "HORIZON_BEAM"),
+            VirtualGift(id = "gift_haya_leaf", name = "Haya Leaf", category = "PREMIUM", coinPrice = 2500, iconSymbol = "💚", animationType = "EMERALD_AURA"),
+            VirtualGift(id = "gift_wafa_branch", name = "Wafa Branch", category = "PREMIUM", coinPrice = 3000, iconSymbol = "🌿", animationType = "GOLDEN_TREE_BURST"),
+            VirtualGift(id = "gift_sadaqah_gem", name = "Sadaqah Gem", category = "PREMIUM", coinPrice = 4000, iconSymbol = "💎", animationType = "ROYAL_GEM_SHINE"),
+            VirtualGift(id = "gift_iman_star", name = "Iman Star", category = "PREMIUM", coinPrice = 5000, iconSymbol = "⭐", animationType = "CONSTELLATION_BURST"),
+            VirtualGift(id = "gift_qadr_moon", name = "Qadr Moon", category = "PREMIUM", coinPrice = 6000, iconSymbol = "🌙", animationType = "CELESTIAL_CRESCENT"),
+            VirtualGift(id = "gift_rida_blossom", name = "Rida Blossom", category = "PREMIUM", coinPrice = 7000, iconSymbol = "🌸", animationType = "PARADISE_BLOOM"),
+            VirtualGift(id = "gift_mahabbah_dove", name = "Mahabbah Dove", category = "PREMIUM", coinPrice = 8000, iconSymbol = "🕊️", animationType = "GOLDEN_DOVE_SWARM"),
+            VirtualGift(id = "gift_bushra_light", name = "Bushra Light", category = "PREMIUM", coinPrice = 9000, iconSymbol = "🌟", animationType = "SUPERNOVA_GLOW"),
+            VirtualGift(id = "gift_tayyib_palm", name = "Tayyib Palm", category = "PREMIUM", coinPrice = 10000, iconSymbol = "🌴", animationType = "GOLDEN_OASIS"),
+            VirtualGift(id = "gift_tuba_tree", name = "Tuba Tree", category = "PREMIUM", coinPrice = 12000, iconSymbol = "🌴", animationType = "TUBA_TREE_JANNAH"),
+            VirtualGift(id = "gift_hikmah_scroll", name = "Hikmah Scroll", category = "PREMIUM", coinPrice = 15000, iconSymbol = "📖", animationType = "DIVINE_SCROLL_UNFOLD"),
+            VirtualGift(id = "gift_ikhlas_heart", name = "Ikhlas Heart", category = "PREMIUM", coinPrice = 20000, iconSymbol = "🤝", animationType = "GOLDEN_UNITY_PULSE"),
+            VirtualGift(id = "gift_yaqeen_gem", name = "Yaqeen Gem", category = "PREMIUM", coinPrice = 25000, iconSymbol = "💎", animationType = "ULTIMATE_CRYSTAL_BEAM"),
+            VirtualGift(id = "gift_barakah_bloom", name = "Barakah Bloom", category = "PREMIUM", coinPrice = 30000, iconSymbol = "🌸", animationType = "BARAKAH_PARADISE_SHOWER"),
+            VirtualGift(id = "gift_sakinah", name = "Sakinah", category = "PREMIUM", coinPrice = 35000, iconSymbol = "🕊️", animationType = "SAKINAH_PEACE_AURA"),
+            VirtualGift(id = "gift_taqwa_leaf", name = "Taqwa Leaf", category = "PREMIUM", coinPrice = 40000, iconSymbol = "💚", animationType = "TAQWA_EMERALD_SHIELD"),
+            VirtualGift(id = "gift_salaam_dove", name = "Salaam Dove", category = "PREMIUM", coinPrice = 45000, iconSymbol = "🕊️", animationType = "SALAAM_ANGELIC_FLIGHT"),
+            VirtualGift(id = "gift_fajr_light", name = "Fajr Light", category = "PREMIUM", coinPrice = 50000, iconSymbol = "🌅", animationType = "DIVINE_FAJR_SUNRISE")
+        )
+
+        for (g in defaultGifts) {
+            if (!existingNames.contains(g.name.trim().lowercase())) {
+                deenTokDao.insertVirtualGift(g)
+            }
+        }
+
+        // --- PREPOPULATE USER WALLET & CREATOR WALLETS ---
+        val wallet = deenTokDao.getUserWallet("current_user").first()
+        if (wallet == null) {
+            deenTokDao.insertOrUpdateUserWallet(UserWallet(userId = "current_user", coinBalance = 500))
+            deenTokDao.insertCoinTransaction(
+                CoinTransaction(
+                    userId = "current_user",
+                    type = "PURCHASE",
+                    amount = 500,
+                    description = "Welcome bonus DT Coins added to wallet"
+                )
+            )
+        }
+
+        val creatorWalletMe = deenTokDao.getCreatorWallet("current_user").first()
+        if (creatorWalletMe == null) {
+            deenTokDao.insertOrUpdateCreatorWallet(
+                CreatorWallet(userId = "current_user", totalGiftsReceived = 6, totalCoinsEarned = 1200, rewardBalanceCoins = 1200)
+            )
+        }
+
+        val creatorWalletMarcus = deenTokDao.getCreatorWallet("marcus123").first()
+        if (creatorWalletMarcus == null) {
+            deenTokDao.insertOrUpdateCreatorWallet(
+                CreatorWallet(userId = "marcus123", totalGiftsReceived = 12, totalCoinsEarned = 2800, rewardBalanceCoins = 2800)
+            )
+        }
+
+        // --- CLEAR DEMO LIVE STREAMS ---
+        val liveStreams = deenTokDao.getActiveLiveStreams().first()
+        liveStreams.forEach { stream ->
+            if (stream.streamKey.startsWith("live_")) {
+                deenTokDao.deleteLiveStreamById(stream.id)
+            }
+        }
     }
+
 }

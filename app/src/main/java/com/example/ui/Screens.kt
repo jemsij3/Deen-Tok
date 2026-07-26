@@ -57,6 +57,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.input.key.*
 import com.example.ui.theme.*
 import com.example.viewmodel.DeenTokViewModel
@@ -72,54 +74,65 @@ fun MainAppScreen(viewModel: DeenTokViewModel) {
     val currentScreen by viewModel.currentScreen.collectAsState()
     val allVideos by viewModel.allVideos.collectAsState()
     val unreadNotifications by viewModel.allNotifications.collectAsState()
+    val activeGiftAnimation by viewModel.activeGiftAnimation.collectAsState()
     
     val unreadCount = unreadNotifications.count { !it.isRead }
 
     if (!isLoggedIn) {
         WelcomeScreen(viewModel = viewModel)
     } else {
-        Scaffold(
-            bottomBar = {
-                if (currentScreen == Screen.HOME || currentScreen == Screen.EXPLORE || 
-                    currentScreen == Screen.UPLOAD || currentScreen == Screen.MESSAGES || 
-                    currentScreen == Screen.PROFILE) {
-                    DeenTokBottomNavigation(
-                        currentScreen = currentScreen,
-                        unreadCount = unreadCount,
-                        viewModel = viewModel,
-                        onNavigate = { screen -> viewModel.setScreen(screen) }
-                    )
-                }
-            },
-            containerColor = Black,
-            contentWindowInsets = WindowInsets.navigationBars
-        ) { innerPadding ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(bottom = if (shouldShowNavBar(currentScreen)) innerPadding.calculateBottomPadding() else 0.dp)
-            ) {
-                when (currentScreen) {
-                    Screen.HOME -> FeedScreen(viewModel)
-                    Screen.EXPLORE -> ExploreScreen(viewModel)
-                    Screen.UPLOAD -> UploadScreen(viewModel)
-                    Screen.LIVE -> LiveScreen(viewModel)
-                    Screen.MESSAGES -> MessagesScreen(viewModel)
-                    Screen.NOTIFICATIONS -> NotificationsSection(viewModel)
-                    Screen.PROFILE -> ProfileScreen(viewModel)
-                    Screen.SETTINGS -> SettingsScreen(viewModel)
-                    Screen.CREATOR_STUDIO -> CreatorStudioScreen(viewModel)
-                    Screen.ADMIN_DASHBOARD -> AdminDashboardScreen(viewModel)
+        Box(modifier = Modifier.fillMaxSize()) {
+            Scaffold(
+                bottomBar = {
+                    if (currentScreen == Screen.HOME || currentScreen == Screen.EXPLORE || 
+                        currentScreen == Screen.UPLOAD || currentScreen == Screen.MESSAGES || 
+                        currentScreen == Screen.PROFILE) {
+                        DeenTokBottomNavigation(
+                            currentScreen = currentScreen,
+                            unreadCount = unreadCount,
+                            viewModel = viewModel,
+                            onNavigate = { screen -> viewModel.setScreen(screen) }
+                        )
+                    }
+                },
+                containerColor = Black,
+                contentWindowInsets = WindowInsets.navigationBars
+            ) { innerPadding ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(bottom = if (shouldShowNavBar(currentScreen)) innerPadding.calculateBottomPadding() else 0.dp)
+                ) {
+                    when (currentScreen) {
+                        Screen.HOME -> FeedScreen(viewModel)
+                        Screen.EXPLORE -> ExploreScreen(viewModel)
+                        Screen.UPLOAD -> UploadScreen(viewModel)
+                        Screen.LIVE -> LiveStreamScreen(viewModel)
+                        Screen.MESSAGES -> MessagesScreen(viewModel)
+                        Screen.NOTIFICATIONS -> NotificationsSection(viewModel)
+                        Screen.PROFILE -> ProfileScreen(viewModel)
+                        Screen.SETTINGS -> SettingsScreen(viewModel)
+                        Screen.CREATOR_STUDIO -> CreatorStudioScreen(viewModel)
+                        Screen.ADMIN_DASHBOARD -> AdminDashboardScreen(viewModel)
+                        Screen.WALLET -> WalletScreen(viewModel, onBack = { viewModel.setScreen(Screen.PROFILE) })
+                        Screen.POLICY_CENTER -> PolicyCenterScreen(viewModel, onBack = { viewModel.setScreen(Screen.SETTINGS) })
+                    }
                 }
             }
+
+            // Global Animated Gift Overlay
+            GiftAnimationOverlay(
+                event = activeGiftAnimation,
+                onDismiss = { viewModel.clearActiveGiftAnimation() }
+            )
         }
     }
 }
 
 private fun shouldShowNavBar(screen: Screen): Boolean {
-    return screen == Screen.HOME || screen == Screen.EXPLORE || 
-           screen == Screen.UPLOAD || screen == Screen.MESSAGES || 
-           screen == Screen.PROFILE
+    return screen == Screen.HOME || screen == Screen.LIVE || 
+           screen == Screen.EXPLORE || screen == Screen.UPLOAD || 
+           screen == Screen.MESSAGES || screen == Screen.PROFILE
 }
 
 // 1. HOME SCREEN (FOR YOU / FOLLOWING FEEDS)
@@ -128,6 +141,8 @@ fun FeedScreen(viewModel: DeenTokViewModel) {
     val allVideos by viewModel.allVideos.collectAsState()
     val homeTab by viewModel.homeTab.collectAsState()
     val activeVideoIdForComments by viewModel.activeVideoIdForComments.collectAsState()
+    val activeLiveStreams by viewModel.activeLiveStreams.collectAsState()
+    val hasActiveLive = activeLiveStreams.isNotEmpty()
     
     val filteredVideos = remember(allVideos, homeTab) {
         if (homeTab == 1) {
@@ -209,42 +224,108 @@ fun FeedScreen(viewModel: DeenTokViewModel) {
             }
         }
 
-        // Top Navigation Tabs
-        Row(
+        // Top Navigation Header (TikTok Style: [LIVE] on Left, [Following | For You] Centered, [Search] on Right)
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(top = 16.dp)
-                .align(Alignment.TopCenter),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(top = 10.dp, start = 16.dp, end = 16.dp)
+                .align(Alignment.TopCenter)
         ) {
-            Text(
-                text = "Following",
-                color = if (homeTab == 1) TextWhite else TextGray,
-                fontWeight = if (homeTab == 1) FontWeight.Bold else FontWeight.Normal,
-                fontSize = 16.sp,
+            // Left: LIVE Stream Entry Button
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .testTag("following_tab")
-                    .clickable { viewModel.setHomeTab(1) }
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-            Box(
+                    .align(Alignment.CenterStart)
+                    .testTag("home_top_live_tab")
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Black.copy(alpha = 0.3f))
+                    .clickable { viewModel.setScreen(Screen.LIVE) }
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(if (hasActiveLive) LiveRed else TextMuted)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "LIVE",
+                    color = TextWhite,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp
+                )
+            }
+
+            // Center: Following | For You Tabs with Active Underline
+            Row(
+                modifier = Modifier.align(Alignment.Center),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .testTag("following_tab")
+                        .clickable { viewModel.setHomeTab(1) }
+                        .padding(vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "Following",
+                        color = if (homeTab == 1) TextWhite else TextWhite.copy(alpha = 0.6f),
+                        fontWeight = if (homeTab == 1) FontWeight.Bold else FontWeight.Medium,
+                        fontSize = 16.sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Box(
+                        modifier = Modifier
+                            .width(24.dp)
+                            .height(2.dp)
+                            .background(if (homeTab == 1) TextWhite else Color.Transparent)
+                    )
+                }
+
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .testTag("for_you_tab")
+                        .clickable { viewModel.setHomeTab(0) }
+                        .padding(vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "For You",
+                        color = if (homeTab == 0) TextWhite else TextWhite.copy(alpha = 0.6f),
+                        fontWeight = if (homeTab == 0) FontWeight.Bold else FontWeight.Medium,
+                        fontSize = 16.sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Box(
+                        modifier = Modifier
+                            .width(24.dp)
+                            .height(2.dp)
+                            .background(if (homeTab == 0) TextWhite else Color.Transparent)
+                    )
+                }
+            }
+
+            // Right: Search Quick Shortcut Button
+            IconButton(
+                onClick = { viewModel.setScreen(Screen.EXPLORE) },
                 modifier = Modifier
-                    .width(1.dp)
-                    .height(16.dp)
-                    .background(TextMuted)
-            )
-            Text(
-                text = "Deen Feed",
-                color = if (homeTab == 0) TextWhite else TextGray,
-                fontWeight = if (homeTab == 0) FontWeight.Bold else FontWeight.Normal,
-                fontSize = 16.sp,
-                modifier = Modifier
-                    .testTag("for_you_tab")
-                    .clickable { viewModel.setHomeTab(0) }
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            )
+                    .align(Alignment.CenterEnd)
+                    .testTag("home_search_shortcut")
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Black.copy(alpha = 0.3f))
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = "Search",
+                    tint = TextWhite,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
 
         // Comments Bottom Sheet overlay
@@ -273,6 +354,8 @@ fun VideoPlayerCard(
     val videoVolume by viewModel.videoVolume.collectAsState()
     var isPlaying by remember(video.id) { mutableStateOf(true) }
     var showPlayOverlay by remember(video.id) { mutableStateOf(false) }
+    var showGiftSheet by remember { mutableStateOf(false) }
+    var showBuyCoinsModal by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
     // Real-time ticking seek bar progress
@@ -547,6 +630,24 @@ fun VideoPlayerCard(
                 Text(
                     text = formatCount(video.commentsCount),
                     color = TextWhite,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            // Gift Action
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                IconButton(
+                    onClick = { showGiftSheet = true },
+                    modifier = Modifier
+                        .testTag("send_gift_video_button")
+                        .size(44.dp)
+                ) {
+                    Text("🎁", fontSize = 28.sp)
+                }
+                Text(
+                    text = "Gift",
+                    color = GoldYellow,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -827,6 +928,28 @@ fun VideoPlayerCard(
                     .size(100.dp)
                     .scale(scale)
                     .rotate((heartOffset.x % 30) - 15)
+            )
+        }
+
+        // Gift Bottom Sheet Overlay
+        if (showGiftSheet) {
+            GiftBottomSheet(
+                viewModel = viewModel,
+                targetUserId = video.userId,
+                targetUsername = video.username,
+                videoId = video.id,
+                onDismiss = { showGiftSheet = false },
+                onOpenBuyCoins = {
+                    showGiftSheet = false
+                    showBuyCoinsModal = true
+                }
+            )
+        }
+
+        if (showBuyCoinsModal) {
+            BuyCoinsDialog(
+                viewModel = viewModel,
+                onDismiss = { showBuyCoinsModal = false }
             )
         }
     }
@@ -3742,16 +3865,6 @@ fun UploadScreen(viewModel: DeenTokViewModel) {
                     }
                 }
 
-                // SIMULATE ERROR SWITCH FOR TESTING
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Simulate Network Error (To test retry flow)", color = TextGray, fontSize = 11.sp)
-                    Switch(checked = simulatedFailToggle, onCheckedChange = { simulatedFailToggle = it }, colors = SwitchDefaults.colors(checkedTrackColor = CyanAccent))
-                }
-
                 // Final Publish Button
                 Button(
                     onClick = {
@@ -3767,7 +3880,7 @@ fun UploadScreen(viewModel: DeenTokViewModel) {
                             allowDownloads = allowDownloads,
                             location = locationInput,
                             coverText = coverOverlayText,
-                            shouldSimulateFail = simulatedFailToggle,
+                            shouldSimulateFail = false,
                             quranRef = quranRef,
                             hadithRef = hadithRef,
                             sourceInfo = sourceInfo,
@@ -3802,7 +3915,7 @@ fun UploadScreen(viewModel: DeenTokViewModel) {
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
 
-                // The 4 Core Tab Selectors
+                // The 5 Core Tab Selectors
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -3810,7 +3923,7 @@ fun UploadScreen(viewModel: DeenTokViewModel) {
                         .padding(4.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    listOf("Camera", "Upload", "Templates", "Drafts").forEach { tab ->
+                    listOf("Camera", "Upload", "Go LIVE", "Templates", "Drafts").forEach { tab ->
                         val sel = currentCreatorTab == tab
                         Box(
                             modifier = Modifier
@@ -3825,36 +3938,9 @@ fun UploadScreen(viewModel: DeenTokViewModel) {
                                 tab,
                                 color = if (sel) Black else TextWhite,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp
+                                fontSize = 10.sp
                             )
                         }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Future Placeholders
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(SurfaceDark, RoundedCornerShape(8.dp))
-                            .padding(8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("📡 LIVE (Coming Soon)", color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(SurfaceDark, RoundedCornerShape(8.dp))
-                            .padding(8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("🎬 Stories (Coming Soon)", color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
                 }
 
@@ -4242,6 +4328,172 @@ fun UploadScreen(viewModel: DeenTokViewModel) {
                                             modifier = Modifier.fillMaxWidth().height(46.dp)
                                         ) {
                                             Text("Enter Creator Editing Workspace ✨", color = Black, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        "Go LIVE" -> {
+                            // GO LIVE CREATOR PORTAL & ELIGIBILITY VERIFICATION
+                            val eligibility = viewModel.checkLiveEligibility()
+                            val minFollowers by viewModel.minFollowersForLive.collectAsState()
+                            val isLiveEnabled by viewModel.isLiveFeatureEnabled.collectAsState()
+                            var liveTitleInput by remember { mutableStateOf("") }
+                            var liveDescInput by remember { mutableStateOf("") }
+                            var selectedLiveCat by remember { mutableStateOf("Quran Recitation") }
+                            val categories = listOf("Quran Recitation", "Islamic Lecture", "Q&A & Fatwa", "Nasheed & Arts", "Daily Reminders")
+
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                                    border = BorderStroke(1.dp, if (eligibility.isEligible) LiveRed else SurfaceVariantDark),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(16.dp),
+                                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(36.dp)
+                                                    .clip(CircleShape)
+                                                    .background(if (eligibility.isEligible) LiveRed else SurfaceVariantDark),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text("🔴", fontSize = 18.sp)
+                                            }
+                                            Column {
+                                                Text(
+                                                    "START LIVE BROADCAST",
+                                                    color = TextWhite,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    fontSize = 16.sp
+                                                )
+                                                Text(
+                                                    if (eligibility.isEligible) "Your account meets all eligibility requirements" else "Account Eligibility Pending",
+                                                    color = if (eligibility.isEligible) CyanAccent else GoldYellow,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
+                                        }
+
+                                        if (!eligibility.isEligible) {
+                                            // Requirements Status Card
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .background(Black.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                                    .padding(12.dp)
+                                            ) {
+                                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    Text(
+                                                        "⚠️ ${eligibility.reason}",
+                                                        color = GoldYellow,
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+
+                                                    Divider(color = SurfaceVariantDark, thickness = 0.5.dp)
+
+                                                    Text("Eligibility Checklist:", color = TextWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+
+                                                    Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                                        Text("Global LIVE Status", color = TextGray, fontSize = 11.sp)
+                                                        Text(if (isLiveEnabled) "✅ Active" else "❌ Disabled by Admin", color = if (isLiveEnabled) CyanAccent else LikeRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                    }
+
+                                                    Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                                        Text("Account Status", color = TextGray, fontSize = 11.sp)
+                                                        Text(if (viewModel.currentUserStatus == "ACTIVE") "✅ Active" else "❌ ${viewModel.currentUserStatus}", color = if (viewModel.currentUserStatus == "ACTIVE") CyanAccent else LikeRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                    }
+
+                                                    Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                                        Text("Min Followers Required", color = TextGray, fontSize = 11.sp)
+                                                        Text("${viewModel.currentUserFollowersCount} / $minFollowers", color = if ((viewModel.currentUserFollowersCount.toIntOrNull() ?: 0) >= minFollowers) CyanAccent else GoldYellow, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            // GO LIVE BROADCAST FORM
+                                            OutlinedTextField(
+                                                value = liveTitleInput,
+                                                onValueChange = { liveTitleInput = it },
+                                                label = { Text("LIVE Stream Title", color = TextGray) },
+                                                placeholder = { Text("e.g. Evening Quran Recitation & Reflection", color = TextMuted) },
+                                                singleLine = true,
+                                                modifier = Modifier.fillMaxWidth().testTag("go_live_title_input"),
+                                                colors = OutlinedTextFieldDefaults.colors(
+                                                    focusedTextColor = TextWhite,
+                                                    focusedBorderColor = LiveRed,
+                                                    unfocusedBorderColor = SurfaceVariantDark
+                                                )
+                                            )
+
+                                            OutlinedTextField(
+                                                value = liveDescInput,
+                                                onValueChange = { liveDescInput = it },
+                                                label = { Text("Description (Optional)", color = TextGray) },
+                                                placeholder = { Text("Share what you will be discussing in this live session...", color = TextMuted) },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                maxLines = 2,
+                                                colors = OutlinedTextFieldDefaults.colors(
+                                                    focusedTextColor = TextWhite,
+                                                    focusedBorderColor = LiveRed,
+                                                    unfocusedBorderColor = SurfaceVariantDark
+                                                )
+                                            )
+
+                                            Text("Select Content Category:", color = GoldYellow, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+
+                                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                items(categories) { cat ->
+                                                    val selCat = cat == selectedLiveCat
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .clip(RoundedCornerShape(20.dp))
+                                                            .background(if (selCat) LiveRed else SurfaceDark)
+                                                            .border(1.dp, if (selCat) LiveRed else SurfaceVariantDark, RoundedCornerShape(20.dp))
+                                                            .clickable { selectedLiveCat = cat }
+                                                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                                                    ) {
+                                                        Text(cat, color = TextWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                    }
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(8.dp))
+
+                                            Button(
+                                                onClick = {
+                                                    if (liveTitleInput.isNotBlank()) {
+                                                        viewModel.startLiveStream(
+                                                            title = liveTitleInput,
+                                                            description = liveDescInput,
+                                                            category = selectedLiveCat
+                                                        )
+                                                    }
+                                                },
+                                                enabled = liveTitleInput.isNotBlank(),
+                                                colors = ButtonDefaults.buttonColors(containerColor = LiveRed),
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(48.dp)
+                                                    .testTag("start_live_now_button"),
+                                                shape = RoundedCornerShape(12.dp)
+                                            ) {
+                                                Text("🔴 Go LIVE Now", color = TextWhite, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
+                                            }
                                         }
                                     }
                                 }
@@ -4858,6 +5110,14 @@ fun ProfileScreen(viewModel: DeenTokViewModel) {
     var showLikesDialog by remember { mutableStateOf(false) }
     var showEditProfileDialog by remember { mutableStateOf(false) }
     var showProfilePicDialog by remember { mutableStateOf(false) }
+    var showProfileMenuBottomSheet by remember { mutableStateOf(false) }
+
+    if (showProfileMenuBottomSheet) {
+        ProfileMenuBottomSheet(
+            viewModel = viewModel,
+            onDismiss = { showProfileMenuBottomSheet = false }
+        )
+    }
 
     if (showProfilePicDialog) {
         ProfilePicChangeDialog(
@@ -4893,14 +5153,40 @@ fun ProfileScreen(viewModel: DeenTokViewModel) {
                     )
                 )
         ) {
-            IconButton(
-                onClick = { viewModel.setScreen(Screen.SETTINGS) },
+            Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .statusBarsPadding()
-                    .padding(8.dp)
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.Settings, contentDescription = "Settings", tint = TextWhite)
+                if (viewModel.hasAdminAccess()) {
+                    Surface(
+                        color = SurfaceDark.copy(alpha = 0.85f),
+                        shape = RoundedCornerShape(20.dp),
+                        border = BorderStroke(1.dp, LikeRed.copy(alpha = 0.6f)),
+                        modifier = Modifier
+                            .clickable { viewModel.setScreen(Screen.ADMIN_DASHBOARD) }
+                            .testTag("profile_top_admin_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(Icons.Default.Shield, contentDescription = "Admin Dashboard", tint = LikeRed, modifier = Modifier.size(16.dp))
+                            Text("Admin", color = TextWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                IconButton(
+                    onClick = { showProfileMenuBottomSheet = true },
+                    modifier = Modifier.testTag("profile_top_menu_button")
+                ) {
+                    Icon(Icons.Default.Menu, contentDescription = "Profile Menu", tint = TextWhite)
+                }
             }
         }
 
@@ -5011,7 +5297,55 @@ fun ProfileScreen(viewModel: DeenTokViewModel) {
                     showLikesDialog = true
                 }
             }
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // TikTok Style Balance Banner Card in Profile
+            val userWallet by viewModel.userWallet.collectAsState()
+            val creatorWallet by viewModel.creatorWallet.collectAsState()
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .clickable { viewModel.setScreen(Screen.WALLET) }
+                    .testTag("profile_balance_card"),
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0xFF26200B),
+                border = BorderStroke(1.dp, GoldYellow)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("🪙", fontSize = 24.sp)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Balance",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                            Text(
+                                text = "DT Coins: ${userWallet?.coinBalance ?: 0} 🪙  •  DT Diamonds: ${creatorWallet?.rewardBalanceCoins ?: 0} 💎",
+                                color = GoldYellow,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = "Balance",
+                        tint = GoldYellow
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Interactive Shortcut Badges for Special Roles (Admins & Creator Insights!)
             Row(
@@ -5021,25 +5355,40 @@ fun ProfileScreen(viewModel: DeenTokViewModel) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(
-                    onClick = { viewModel.setScreen(Screen.CREATOR_STUDIO) },
+                    onClick = { viewModel.setScreen(Screen.LIVE) },
                     modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = SurfaceDark),
+                    colors = ButtonDefaults.buttonColors(containerColor = LiveRed),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Icon(Icons.Default.BarChart, contentDescription = "Stats", tint = CyanAccent, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Videocam, contentDescription = "Go LIVE", tint = TextWhite, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Creator Studio", color = CyanAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("Go LIVE", color = TextWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
 
-                Button(
-                    onClick = { viewModel.setScreen(Screen.ADMIN_DASHBOARD) },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = SurfaceDark),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Icon(Icons.Default.Shield, contentDescription = "Admin", tint = LikeRed, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Admin Dashboard", color = LikeRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                if (viewModel.hasCreatorAccess()) {
+                    Button(
+                        onClick = { viewModel.setScreen(Screen.CREATOR_STUDIO) },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = SurfaceDark),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.BarChart, contentDescription = "Stats", tint = CyanAccent, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Studio", color = CyanAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                if (viewModel.hasAdminAccess()) {
+                    Button(
+                        onClick = { viewModel.setScreen(Screen.ADMIN_DASHBOARD) },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = SurfaceDark),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.Shield, contentDescription = "Admin", tint = LikeRed, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Admin", color = LikeRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(24.dp))
@@ -5063,7 +5412,7 @@ fun ProfileScreen(viewModel: DeenTokViewModel) {
             }
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Profile grid contents
+            // Profile Video Grid (3-Column TikTok Grid Layout)
             val displayedVideos = when (activeProfileTab) {
                 0 -> myVideos
                 1 -> likedVideos
@@ -5074,52 +5423,128 @@ fun ProfileScreen(viewModel: DeenTokViewModel) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(150.dp),
+                        .height(180.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "No videos in this section yet.",
-                        color = TextMuted,
-                        fontSize = 13.sp
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = when (activeProfileTab) {
+                                1 -> Icons.Default.FavoriteBorder
+                                2 -> Icons.Default.BookmarkBorder
+                                else -> Icons.Default.Videocam
+                            },
+                            contentDescription = null,
+                            tint = TextMuted,
+                            modifier = Modifier.size(36.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = when (activeProfileTab) {
+                                1 -> "No liked videos yet"
+                                2 -> "No bookmarked videos yet"
+                                else -> "Your videos will appear here"
+                            },
+                            color = TextMuted,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             } else {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // Chunk videos into rows of 3 items
+                val videoRows = remember(displayedVideos) { displayedVideos.chunked(3) }
+                
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    displayedVideos.forEach { video ->
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .aspectRatio(0.7f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(SurfaceDark)
-                                .border(0.5.dp, SurfaceVariantDark, RoundedCornerShape(8.dp))
-                                .clickable { viewModel.setScreen(Screen.HOME) }
+                    videoRows.forEach { rowVideos ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(8.dp),
-                                verticalArrangement = Arrangement.Bottom
-                            ) {
-                                Text(
-                                    text = video.title,
-                                    color = TextWhite,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                            rowVideos.forEach { video ->
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .aspectRatio(0.75f)
+                                        .background(SurfaceDark)
+                                        .clickable { viewModel.setScreen(Screen.HOME) }
+                                ) {
+                                    if (video.videoUrl.isNotBlank() && !isVideoFile(video.videoUrl)) {
+                                        coil.compose.AsyncImage(
+                                            model = video.videoUrl,
+                                            contentDescription = video.title,
+                                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    } else {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(
+                                                    Brush.verticalGradient(
+                                                        listOf(SurfaceVariantDark, DarkGrey)
+                                                    )
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.PlayArrow,
+                                                contentDescription = null,
+                                                tint = TextWhite.copy(alpha = 0.3f),
+                                                modifier = Modifier.size(32.dp)
+                                            )
+                                        }
+                                    }
+
+                                    // Gradient Overlay at Bottom for Legibility
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(40.dp)
+                                            .align(Alignment.BottomCenter)
+                                            .background(
+                                                Brush.verticalGradient(
+                                                    listOf(Color.Transparent, Black.copy(alpha = 0.8f))
+                                                )
+                                            )
+                                    )
+
+                                    // View Count Overlay (TikTok Style: ▶ 12.5k)
+                                    Row(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomStart)
+                                            .padding(6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.PlayArrow,
+                                            contentDescription = "Views",
+                                            tint = TextWhite,
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                        Text(
+                                            text = formatCount(video.viewsCount),
+                                            color = TextWhite,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
                             }
-                        }
-                    }
-                    if (displayedVideos.size < 3) {
-                        repeat(3 - displayedVideos.size) {
-                            Spacer(modifier = Modifier.weight(1f))
+
+                            // Pad empty cells in last incomplete row to preserve 3-column ratio
+                            if (rowVideos.size < 3) {
+                                repeat(3 - rowVideos.size) {
+                                    Spacer(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .aspectRatio(0.75f)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -5843,6 +6268,18 @@ fun SettingsScreen(viewModel: DeenTokViewModel) {
                             )
                         }
 
+                        if (viewModel.hasAdminAccess()) {
+                            item {
+                                SettingsMenuRow(
+                                    title = "Admin Dashboard Console 🛡️",
+                                    desc = "Manage users, creators, videos, reports, live streams & ads",
+                                    icon = Icons.Default.Shield,
+                                    testTag = "settings_section_admin",
+                                    onClick = { viewModel.setScreen(Screen.ADMIN_DASHBOARD) }
+                                )
+                            }
+                        }
+
                         item {
                             SettingsMenuRow(
                                 title = trans.settingsAccount,
@@ -5851,6 +6288,8 @@ fun SettingsScreen(viewModel: DeenTokViewModel) {
                                 testTag = "settings_section_account",
                                 onClick = { currentSection = SettingsSection.ACCOUNT }
                             )
+                        }
+                        item {
                             SettingsMenuRow(
                                 title = trans.settingsPrivacy,
                                 desc = "Private account, who can follow, comment, download",
@@ -5858,6 +6297,8 @@ fun SettingsScreen(viewModel: DeenTokViewModel) {
                                 testTag = "settings_section_privacy",
                                 onClick = { currentSection = SettingsSection.PRIVACY }
                             )
+                        }
+                        item {
                             SettingsMenuRow(
                                 title = "Security & Sign-in",
                                 desc = "Change password, email verification, 2FA status",
@@ -5865,6 +6306,8 @@ fun SettingsScreen(viewModel: DeenTokViewModel) {
                                 testTag = "settings_section_security",
                                 onClick = { currentSection = SettingsSection.SECURITY }
                             )
+                        }
+                        item {
                             SettingsMenuRow(
                                 title = trans.settingsNotifications,
                                 desc = "Likes, comments, follower and creator push updates",
@@ -5872,6 +6315,8 @@ fun SettingsScreen(viewModel: DeenTokViewModel) {
                                 testTag = "settings_section_notifications",
                                 onClick = { currentSection = SettingsSection.NOTIFICATIONS }
                             )
+                        }
+                        item {
                             SettingsMenuRow(
                                 title = trans.settingsLanguage,
                                 desc = "Set app translation to English, Oromo, Amharic",
@@ -5879,6 +6324,8 @@ fun SettingsScreen(viewModel: DeenTokViewModel) {
                                 testTag = "settings_section_language",
                                 onClick = { currentSection = SettingsSection.LANGUAGE }
                             )
+                        }
+                        item {
                             SettingsMenuRow(
                                 title = "Appearance Style",
                                 desc = "Dark, Light, System default configurations",
@@ -5886,6 +6333,8 @@ fun SettingsScreen(viewModel: DeenTokViewModel) {
                                 testTag = "settings_section_appearance",
                                 onClick = { currentSection = SettingsSection.APPEARANCE }
                             )
+                        }
+                        item {
                             SettingsMenuRow(
                                 title = trans.settingsContent,
                                 desc = "Video interest filters, sensitive content, autoplay",
@@ -5893,6 +6342,8 @@ fun SettingsScreen(viewModel: DeenTokViewModel) {
                                 testTag = "settings_section_content",
                                 onClick = { currentSection = SettingsSection.CONTENT }
                             )
+                        }
+                        item {
                             SettingsMenuRow(
                                 title = "Accessibility Features",
                                 desc = "Text size adjustments, reduced motion, captions",
@@ -5900,6 +6351,8 @@ fun SettingsScreen(viewModel: DeenTokViewModel) {
                                 testTag = "settings_section_accessibility",
                                 onClick = { currentSection = SettingsSection.ACCESSIBILITY }
                             )
+                        }
+                        item {
                             SettingsMenuRow(
                                 title = trans.settingsHelp,
                                 desc = "Help Center FAQs, contact support, report problems",
@@ -5907,6 +6360,17 @@ fun SettingsScreen(viewModel: DeenTokViewModel) {
                                 testTag = "settings_section_support",
                                 onClick = { currentSection = SettingsSection.SUPPORT }
                             )
+                        }
+                        item {
+                            SettingsMenuRow(
+                                title = "Terms & Policies 📜",
+                                desc = "Community Guidelines, Terms of Service, Privacy Policy & IP Policy",
+                                icon = Icons.Default.Gavel,
+                                testTag = "settings_section_terms_and_policies",
+                                onClick = { viewModel.openPolicyCenter(0) }
+                            )
+                        }
+                        item {
                             SettingsMenuRow(
                                 title = trans.settingsAbout,
                                 desc = "App version, license information, follow social links",
@@ -6912,17 +7376,23 @@ fun SettingsScreen(viewModel: DeenTokViewModel) {
                         Text("Hotline support: +251 116 DEENTOK (Addis Ababa)", color = TextGray, fontSize = 12.sp)
                         Text("Official support email: support@deentok.app", color = TextGray, fontSize = 12.sp)
                         Spacer(modifier = Modifier.height(12.dp))
-                        Text("COMMUNITY & LEGAL", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text("COMMUNITY & LEGAL POLICIES", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         
-                        listOf("Community Guidelines", "Privacy Policy", "Terms of Service").forEach { item ->
+                        listOf(
+                            Triple("Community Guidelines", 0, "settings_link_cg"),
+                            Triple("Terms of Service", 1, "settings_link_tos"),
+                            Triple("Privacy Policy", 2, "settings_link_pp"),
+                            Triple("Intellectual Property Policy", 3, "settings_link_ip")
+                        ).forEach { (title, tabIndex, tag) ->
                             Text(
-                                text = "• View $item",
+                                text = "• View $title",
                                 color = CyanAccent,
                                 fontSize = 12.sp,
                                 modifier = Modifier
                                     .padding(vertical = 4.dp)
+                                    .testTag(tag)
                                     .clickable {
-                                        android.widget.Toast.makeText(context, "Displaying $item: Adhere to positive interaction standards.", android.widget.Toast.LENGTH_SHORT).show()
+                                        viewModel.openPolicyCenter(tabIndex)
                                     }
                             )
                         }
@@ -8820,7 +9290,7 @@ fun MonetizationTierCard(
 // REDESIGNED ADMIN DASHBOARD REBUILT IN AdminDashboard.kt
 // --- OTHER SHARED COMPONENT OVERLAYS ---
 
-// Bottom Navigation pill items
+// Bottom Navigation pill items (TikTok Design System)
 @Composable
 fun DeenTokBottomNavigation(
     currentScreen: Screen,
@@ -8829,9 +9299,10 @@ fun DeenTokBottomNavigation(
     onNavigate: (Screen) -> Unit
 ) {
     val trans = getTranslations(viewModel)
+
     val items = listOf(
         NavigationItem(trans.navHome, Screen.HOME, Icons.Default.Home, Icons.Outlined.Home),
-        NavigationItem(trans.navExplore, Screen.EXPLORE, Icons.Default.Explore, Icons.Outlined.Explore),
+        NavigationItem(trans.navExplore, Screen.EXPLORE, Icons.Default.CompassCalibration, Icons.Outlined.Explore),
         NavigationItem(trans.navAdd, Screen.UPLOAD, Icons.Default.Add, Icons.Default.Add),
         NavigationItem(trans.navMessages, Screen.MESSAGES, Icons.Default.Mail, Icons.Outlined.Mail),
         NavigationItem(trans.navProfile, Screen.PROFILE, Icons.Default.Person, Icons.Outlined.Person)
@@ -8840,13 +9311,13 @@ fun DeenTokBottomNavigation(
     Surface(
         color = Black,
         tonalElevation = 8.dp,
-        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.05f))
+        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.08f))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(vertical = 10.dp, horizontal = 12.dp),
+                .padding(vertical = 6.dp, horizontal = 12.dp),
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -8854,34 +9325,60 @@ fun DeenTokBottomNavigation(
                 val selected = currentScreen == item.screen
                 
                 if (item.screen == Screen.UPLOAD) {
-                    // Custom Add Button highlighted with shadows
+                    // Iconic TikTok Create Button (White Pill with Cyan and Red side accents)
                     Box(
                         modifier = Modifier
                             .testTag("upload_nav_button")
-                            .width(52.dp)
-                            .height(38.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(TextWhite)
+                            .width(46.dp)
+                            .height(30.dp)
                             .clickable { onNavigate(item.screen) },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Upload",
-                            tint = Black,
-                            modifier = Modifier.size(24.dp)
+                        // Cyan Accent Background (Left offset)
+                        Box(
+                            modifier = Modifier
+                                .offset(x = (-3.5).dp)
+                                .width(38.dp)
+                                .height(28.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(CyanAccent)
                         )
+                        // Red Accent Background (Right offset)
+                        Box(
+                            modifier = Modifier
+                                .offset(x = 3.5.dp)
+                                .width(38.dp)
+                                .height(28.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(LikeRed)
+                        )
+                        // Center White Pill Frame
+                        Box(
+                            modifier = Modifier
+                                .width(38.dp)
+                                .height(28.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(TextWhite),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Upload",
+                                tint = Black,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 } else {
-                    // Standard icons with badge notifications
+                    // TikTok Standard Nav Items
                     Column(
                         modifier = Modifier
                             .testTag(item.screen.name.lowercase() + "_nav_tab")
                             .clickable { onNavigate(item.screen) }
-                            .padding(vertical = 4.dp, horizontal = 12.dp)
-                            .widthIn(min = 60.dp),
+                            .padding(vertical = 4.dp, horizontal = 10.dp)
+                            .widthIn(min = 54.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
@@ -8890,26 +9387,28 @@ fun DeenTokBottomNavigation(
                                 tint = if (selected) TextWhite else TextWhite.copy(alpha = 0.5f),
                                 modifier = Modifier.size(24.dp)
                             )
-                            // Render unread notifications alert badge on inbox tab
+                            
+                            // Unread Notification Badge on Inbox
                             if (item.screen == Screen.MESSAGES && unreadCount > 0) {
                                 Box(
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
-                                        .offset(x = 8.dp, y = (-4).dp)
-                                        .size(16.dp)
+                                        .offset(x = 8.dp, y = (-2).dp)
                                         .clip(CircleShape)
-                                        .background(LikeRed),
+                                        .background(LikeRed)
+                                        .padding(horizontal = 4.dp, vertical = 1.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = unreadCount.toString(),
+                                        text = if (unreadCount > 99) "99+" else unreadCount.toString(),
                                         color = TextWhite,
-                                        fontSize = 9.sp,
+                                        fontSize = 8.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
                         }
+                        
                         Text(
                             text = item.label,
                             color = if (selected) TextWhite else TextWhite.copy(alpha = 0.5f),
@@ -9452,40 +9951,138 @@ fun WelcomeLoginFormCard(
     translations: DeenTokTranslations,
     onDismiss: () -> Unit
 ) {
+    var isPhoneLogin by remember { mutableStateOf(false) }
+    var identifierInput by remember { mutableStateOf(if (isPhoneLogin) "+251911223344" else "@me") }
+    var passwordInput by remember { mutableStateOf("admin123") }
+    var isPasswordVisible by remember { mutableStateOf(false) }
+    var errorText by remember { mutableStateOf<String?>(null) }
+    var showForgotPasswordModal by remember { mutableStateOf(false) }
+    var forgotEmailInput by remember { mutableStateOf("") }
+    var forgotSuccessMsg by remember { mutableStateOf<String?>(null) }
+    val selectedLanguage by viewModel.selectedLanguage.collectAsState()
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
             .background(SurfaceDark)
             .border(1.dp, CyanAccent.copy(alpha = 0.4f), RoundedCornerShape(24.dp))
-            .padding(24.dp)
+            .padding(20.dp)
+            .verticalScroll(rememberScrollState())
     ) {
+        // App Logo & Language Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                DeenTokLogo(sizeDp = 32.dp)
+                Text("Deen Tok", color = TextWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+
+            // Language Selector Chips
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Language.values().forEach { lang ->
+                    val isSelected = selectedLanguage == lang.code
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isSelected) CyanAccent else SurfaceVariantDark)
+                            .clickable { viewModel.setLanguage(lang.code) }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "${lang.flag} ${lang.code.uppercase()}",
+                            color = if (isSelected) Black else TextWhite,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         Text(
             text = translations.welcomeBackTitle,
             color = TextWhite,
-            fontSize = 22.sp,
+            fontSize = 20.sp,
             fontWeight = FontWeight.Bold
         )
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = translations.description,
+            text = "Secure Login • Role Verification Enabled",
             color = TextGray,
-            fontSize = 12.sp,
-            lineHeight = 16.sp
+            fontSize = 12.sp
         )
-        Spacer(modifier = Modifier.height(20.dp))
-        
-        var usernameInput by remember { mutableStateOf("@me") }
-        var passwordInput by remember { mutableStateOf("") }
-        var errorText by remember { mutableStateOf<String?>(null) }
-        
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Email / Phone Mode Sub-Toggle
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(Black)
+                .padding(4.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (!isPhoneLogin) CyanAccent else Color.Transparent)
+                    .clickable {
+                        isPhoneLogin = false
+                        identifierInput = "@me"
+                        errorText = null
+                    }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "📧 Email / Username",
+                    color = if (!isPhoneLogin) Black else TextWhite,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (isPhoneLogin) CyanAccent else Color.Transparent)
+                    .clickable {
+                        isPhoneLogin = true
+                        identifierInput = "+251911223344"
+                        errorText = null
+                    }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "📱 Phone Number",
+                    color = if (isPhoneLogin) Black else TextWhite,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Identifier input
         OutlinedTextField(
-            value = usernameInput,
+            value = identifierInput,
             onValueChange = {
-                usernameInput = it
-                if (it.isNotBlank()) errorText = null
+                identifierInput = it
+                errorText = null
             },
-            label = { Text(translations.usernameLabel) },
+            label = { Text(if (isPhoneLogin) "Phone Number (e.g. +251...)" else translations.usernameLabel) },
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = CyanAccent,
                 unfocusedBorderColor = TextGray.copy(alpha = 0.5f),
@@ -9501,12 +10098,27 @@ fun WelcomeLoginFormCard(
                 .fillMaxWidth()
                 .testTag("username_input")
         )
+
         Spacer(modifier = Modifier.height(12.dp))
-        
+
+        // Password input with Show/Hide Toggle
         OutlinedTextField(
             value = passwordInput,
-            onValueChange = { passwordInput = it },
+            onValueChange = {
+                passwordInput = it
+                errorText = null
+            },
             label = { Text(translations.passwordLabel) },
+            visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
+                    Icon(
+                        imageVector = if (isPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        contentDescription = if (isPasswordVisible) "Hide Password" else "Show Password",
+                        tint = TextGray
+                    )
+                }
+            },
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = CyanAccent,
                 unfocusedBorderColor = TextGray.copy(alpha = 0.5f),
@@ -9522,14 +10134,114 @@ fun WelcomeLoginFormCard(
                 .fillMaxWidth()
                 .testTag("password_input")
         )
-        
+
+        // Forgot password row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            horizontalArrangement = Arrangement.End
+        ) {
+            Text(
+                text = "Forgot Password?",
+                color = CyanAccent,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .clickable { showForgotPasswordModal = true }
+                    .testTag("forgot_password_button")
+            )
+        }
+
         if (errorText != null) {
             Spacer(modifier = Modifier.height(8.dp))
-            Text(text = errorText!!, color = LikeRed, fontSize = 12.sp)
+            Text(text = errorText!!, color = LikeRed, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
-        
-        Spacer(modifier = Modifier.height(24.dp))
-        
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Account Login Role Options
+        Text(
+            text = "Select Account Role:",
+            color = TextWhite,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF2C1013))
+                    .border(1.dp, LikeRed.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                    .clickable { viewModel.loginWithDemoPreset("SUPER_ADMIN") }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("🛡️ Super Admin", color = LikeRed, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF1E293B))
+                    .border(1.dp, CyanAccent.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                    .clickable { viewModel.loginWithDemoPreset("ADMIN") }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("👮 Moderator", color = CyanAccent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF1B2A1B))
+                    .border(1.dp, Color(0xFF4CAF50), RoundedCornerShape(8.dp))
+                    .clickable { viewModel.loginWithDemoPreset("CREATOR") }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("🎨 Creator", color = Color(0xFF4CAF50), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(SurfaceVariantDark)
+                    .border(1.dp, TextGray.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                    .clickable { viewModel.loginWithDemoPreset("USER") }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("👤 User", color = TextWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Google Login Option
+        OutlinedButton(
+            onClick = {
+                viewModel.loginWithDemoPreset("USER")
+            },
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextWhite),
+            border = BorderStroke(1.dp, TextGray.copy(alpha = 0.5f)),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(44.dp)
+                .testTag("google_login_button")
+        ) {
+            Text("🌐 Continue with Google Login", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -9546,15 +10258,12 @@ fun WelcomeLoginFormCard(
             ) {
                 Text(translations.cancelText)
             }
-            
+
             Button(
                 onClick = {
-                    if (usernameInput.isBlank()) {
-                        errorText = translations.validationEmptyUsername
-                    } else {
-                        viewModel.currentUsername = if (usernameInput.startsWith("@")) usernameInput else "@$usernameInput"
-                        viewModel.currentUserAvatar = usernameInput.filter { it.isLetter() }.take(2).uppercase().ifEmpty { "ME" }
-                        viewModel.logIn()
+                    val err = viewModel.loginWithCredentials(identifierInput, passwordInput, isPhoneLogin)
+                    if (err != null) {
+                        errorText = err
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = CyanAccent, contentColor = Black),
@@ -9567,6 +10276,57 @@ fun WelcomeLoginFormCard(
                 Text(translations.submitText, fontWeight = FontWeight.Bold)
             }
         }
+    }
+
+    if (showForgotPasswordModal) {
+        AlertDialog(
+            onDismissRequest = { showForgotPasswordModal = false },
+            containerColor = SurfaceDark,
+            title = { Text("Reset Password 🔐", color = TextWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "Enter your verified Email Address or Phone Number to receive a 6-digit security reset code.",
+                        color = TextGray,
+                        fontSize = 12.sp
+                    )
+                    OutlinedTextField(
+                        value = forgotEmailInput,
+                        onValueChange = { forgotEmailInput = it },
+                        label = { Text("Email or Phone") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = CyanAccent,
+                            unfocusedBorderColor = TextGray,
+                            focusedTextColor = TextWhite,
+                            unfocusedTextColor = TextWhite
+                        ),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (forgotSuccessMsg != null) {
+                        Text(forgotSuccessMsg!!, color = Color(0xFF4CAF50), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (forgotEmailInput.isNotBlank()) {
+                            viewModel.resetPassword(forgotEmailInput, "newPassword123")
+                            forgotSuccessMsg = "✅ Password reset link & OTP sent to $forgotEmailInput"
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = CyanAccent, contentColor = Black)
+                ) {
+                    Text("Send Code", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showForgotPasswordModal = false }) {
+                    Text("Close", color = TextGray)
+                }
+            }
+        )
     }
 }
 
@@ -9582,29 +10342,48 @@ fun WelcomeSignUpFormCard(
             .clip(RoundedCornerShape(24.dp))
             .background(SurfaceDark)
             .border(1.dp, CyanAccent.copy(alpha = 0.4f), RoundedCornerShape(24.dp))
-            .padding(24.dp)
+            .padding(20.dp)
+            .verticalScroll(rememberScrollState())
     ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                DeenTokLogo(sizeDp = 32.dp)
+                Text("Deen Tok", color = TextWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+            Text("Sign Up", color = CyanAccent, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
         Text(
             text = translations.createAccountTitle,
             color = TextWhite,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold
         )
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = translations.description,
+            text = "Join the halal social media platform",
             color = TextGray,
-            fontSize = 11.sp,
-            lineHeight = 15.sp
+            fontSize = 12.sp
         )
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         var fullNameInput by remember { mutableStateOf("") }
         var usernameInput by remember { mutableStateOf("") }
-        var emailInput by remember { mutableStateOf("") }
+        var identifierInput by remember { mutableStateOf("") }
+        var passwordInput by remember { mutableStateOf("") }
+        var isPasswordVisible by remember { mutableStateOf(false) }
         var bioInput by remember { mutableStateOf("") }
         var errorText by remember { mutableStateOf<String?>(null) }
-        
+
         OutlinedTextField(
             value = fullNameInput,
             onValueChange = {
@@ -9628,7 +10407,7 @@ fun WelcomeSignUpFormCard(
                 .testTag("fullname_input")
         )
         Spacer(modifier = Modifier.height(8.dp))
-        
+
         OutlinedTextField(
             value = usernameInput,
             onValueChange = {
@@ -9652,11 +10431,11 @@ fun WelcomeSignUpFormCard(
                 .testTag("signup_username_input")
         )
         Spacer(modifier = Modifier.height(8.dp))
-        
+
         OutlinedTextField(
-            value = emailInput,
-            onValueChange = { emailInput = it },
-            label = { Text(translations.emailLabel) },
+            value = identifierInput,
+            onValueChange = { identifierInput = it },
+            label = { Text("${translations.emailLabel} / Phone Number") },
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = CyanAccent,
                 unfocusedBorderColor = TextGray.copy(alpha = 0.5f),
@@ -9673,7 +10452,38 @@ fun WelcomeSignUpFormCard(
                 .testTag("signup_email_input")
         )
         Spacer(modifier = Modifier.height(8.dp))
-        
+
+        OutlinedTextField(
+            value = passwordInput,
+            onValueChange = { passwordInput = it },
+            label = { Text("${translations.passwordLabel} (min 6 chars)") },
+            visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
+                    Icon(
+                        imageVector = if (isPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        contentDescription = if (isPasswordVisible) "Hide Password" else "Show Password",
+                        tint = TextGray
+                    )
+                }
+            },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = CyanAccent,
+                unfocusedBorderColor = TextGray.copy(alpha = 0.5f),
+                focusedLabelColor = CyanAccent,
+                unfocusedLabelColor = TextGray,
+                focusedTextColor = TextWhite,
+                unfocusedTextColor = TextWhite,
+                focusedContainerColor = Black,
+                unfocusedContainerColor = Black
+            ),
+            singleLine = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("signup_password_input")
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
         OutlinedTextField(
             value = bioInput,
             onValueChange = { bioInput = it },
@@ -9693,14 +10503,32 @@ fun WelcomeSignUpFormCard(
                 .fillMaxWidth()
                 .testTag("signup_bio_input")
         )
-        
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Role Notice
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(SurfaceVariantDark)
+                .padding(10.dp)
+        ) {
+            Text(
+                "🔒 Registration creates a Normal User account. Users only see feeds, messages, notifications, and settings allowed by admins. Admin & Creator access requires separate authorization.",
+                color = TextGray,
+                fontSize = 11.sp,
+                lineHeight = 15.sp
+            )
+        }
+
         if (errorText != null) {
             Spacer(modifier = Modifier.height(8.dp))
-            Text(text = errorText!!, color = LikeRed, fontSize = 12.sp)
+            Text(text = errorText!!, color = LikeRed, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -9717,20 +10545,12 @@ fun WelcomeSignUpFormCard(
             ) {
                 Text(translations.cancelText)
             }
-            
+
             Button(
                 onClick = {
-                    if (fullNameInput.isBlank()) {
-                        errorText = translations.validationEmptyName
-                    } else if (usernameInput.isBlank()) {
-                        errorText = translations.validationEmptyUsername
-                    } else {
-                        viewModel.currentUsername = if (usernameInput.startsWith("@")) usernameInput else "@$usernameInput"
-                        viewModel.currentUserAvatar = fullNameInput.filter { it.isLetter() }.take(2).uppercase().ifEmpty { "ME" }
-                        if (bioInput.isNotBlank()) {
-                            viewModel.currentUserBio = bioInput
-                        }
-                        viewModel.signUp()
+                    val err = viewModel.signUpUser(fullNameInput, usernameInput, identifierInput, passwordInput, bioInput)
+                    if (err != null) {
+                        errorText = err
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = CyanAccent, contentColor = Black),
@@ -9742,6 +10562,204 @@ fun WelcomeSignUpFormCard(
             ) {
                 Text(translations.signUpButton, fontWeight = FontWeight.Bold)
             }
+        }
+    }
+}
+
+// --- PROFILE MENU BOTTOM SHEET (TIKTOK STYLE) ---
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ProfileMenuBottomSheet(
+    viewModel: DeenTokViewModel,
+    onDismiss: () -> Unit
+) {
+    val userWallet by viewModel.userWallet.collectAsState()
+    val creatorWallet by viewModel.creatorWallet.collectAsState()
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceDark,
+        contentColor = TextWhite
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 12.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Profile Menu",
+                    color = TextWhite,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 18.sp
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = TextGray)
+                }
+            }
+
+            HorizontalDivider(color = SurfaceVariantDark, thickness = 0.5.dp)
+
+            // 1. Balance Option (TikTok Economy Entry Point)
+            Surface(
+                color = Color(0xFF231F0F),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, GoldYellow.copy(alpha = 0.8f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        onDismiss()
+                        viewModel.setScreen(Screen.WALLET)
+                    }
+                    .testTag("menu_balance_option")
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(GoldYellow.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("🪙", fontSize = 20.sp)
+                        }
+                        Column {
+                            Text(
+                                text = "Balance",
+                                color = TextWhite,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 16.sp
+                            )
+                            Text(
+                                text = "Coins: ${userWallet?.coinBalance ?: 0} 🪙  •  Diamonds: ${creatorWallet?.rewardBalanceCoins ?: 0} 💎",
+                                color = GoldYellow,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = GoldYellow)
+                }
+            }
+
+            // 2. Settings & Privacy
+            ProfileMenuItem(
+                icon = Icons.Default.Settings,
+                title = "Settings and Privacy",
+                subtitle = "Manage account, notifications, and security",
+                iconTint = CyanAccent,
+                onClick = {
+                    onDismiss()
+                    viewModel.setScreen(Screen.SETTINGS)
+                }
+            )
+
+            // 3. Admin Dashboard (if admin)
+            if (viewModel.hasAdminAccess()) {
+                ProfileMenuItem(
+                    icon = Icons.Default.Shield,
+                    title = "Admin Control Dashboard",
+                    subtitle = "System moderation, creator approvals, and policy audits",
+                    iconTint = LikeRed,
+                    onClick = {
+                        onDismiss()
+                        viewModel.setScreen(Screen.ADMIN_DASHBOARD)
+                    }
+                )
+            }
+
+            // 4. Policy & Community Center
+            ProfileMenuItem(
+                icon = Icons.Default.Policy,
+                title = "Policy & Community Center",
+                subtitle = "Read Islamic guidelines, monetization policy & rules",
+                iconTint = EmeraldGreen,
+                onClick = {
+                    onDismiss()
+                    viewModel.setScreen(Screen.POLICY_CENTER)
+                }
+            )
+
+            // 5. Logout Option
+            ProfileMenuItem(
+                icon = Icons.Default.Logout,
+                title = "Log Out",
+                subtitle = "Switch account or end current session",
+                iconTint = TextMuted,
+                onClick = {
+                    onDismiss()
+                    viewModel.logout()
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun ProfileMenuItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    iconTint: Color,
+    onClick: () -> Unit
+) {
+    Surface(
+        color = SurfaceVariantDark.copy(alpha = 0.5f),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(iconTint.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(20.dp))
+                }
+                Column {
+                    Text(
+                        text = title,
+                        color = TextWhite,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = subtitle,
+                        color = TextGray,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = TextGray)
         }
     }
 }

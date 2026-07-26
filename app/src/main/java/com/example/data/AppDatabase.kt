@@ -17,9 +17,23 @@ import androidx.room.RoomDatabase
         Advertisement::class,
         AdminLog::class,
         UserPreferences::class,
-        RecentSearch::class
+        RecentSearch::class,
+        UserWallet::class,
+        CoinPackage::class,
+        PaymentTransaction::class,
+        CoinTransaction::class,
+        VirtualGift::class,
+        GiftTransaction::class,
+        CreatorWallet::class,
+        WithdrawalRequest::class,
+        LiveStream::class,
+        LiveChatMessage::class,
+        LiveViewer::class,
+        LiveModerator::class,
+        LiveReport::class,
+        LiveAnalytics::class
     ],
-    version = 7,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

@@ -6,6 +6,9 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface DeenTokDao {
     // Videos
+    @Query("SELECT * FROM videos WHERE id = :videoId")
+    fun getVideoById(videoId: Int): Flow<Video?>
+
     @Query("SELECT * FROM videos ORDER BY id DESC")
     fun getAllVideos(): Flow<List<Video>>
 
@@ -141,5 +144,168 @@ interface DeenTokDao {
 
     @Query("DELETE FROM recent_searches")
     suspend fun clearRecentSearches()
+
+    // --- DT COIN & GIFT ECONOMY DAO METHODS ---
+
+    // User Wallet
+    @Query("SELECT * FROM user_wallets WHERE userId = :userId LIMIT 1")
+    fun getUserWallet(userId: String): Flow<UserWallet?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrUpdateUserWallet(wallet: UserWallet)
+
+    // Coin Packages
+    @Query("SELECT * FROM coin_packages ORDER BY priceEtb ASC")
+    fun getAllCoinPackages(): Flow<List<CoinPackage>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCoinPackage(pkg: CoinPackage)
+
+    @Update
+    suspend fun updateCoinPackage(pkg: CoinPackage)
+
+    @Delete
+    suspend fun deleteCoinPackage(pkg: CoinPackage)
+
+    // Payment Transactions
+    @Query("SELECT * FROM payment_transactions ORDER BY createdAt DESC")
+    fun getAllPaymentTransactions(): Flow<List<PaymentTransaction>>
+
+    @Query("SELECT * FROM payment_transactions WHERE userId = :userId ORDER BY createdAt DESC")
+    fun getUserPaymentTransactions(userId: String): Flow<List<PaymentTransaction>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPaymentTransaction(tx: PaymentTransaction): Long
+
+    @Update
+    suspend fun updatePaymentTransaction(tx: PaymentTransaction)
+
+    // Coin Transactions
+    @Query("SELECT * FROM coin_transactions WHERE userId = :userId ORDER BY createdAt DESC")
+    fun getUserCoinTransactions(userId: String): Flow<List<CoinTransaction>>
+
+    @Query("SELECT * FROM coin_transactions ORDER BY createdAt DESC")
+    fun getAllCoinTransactions(): Flow<List<CoinTransaction>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCoinTransaction(tx: CoinTransaction)
+
+    // Virtual Gifts
+    @Query("SELECT * FROM virtual_gifts ORDER BY coinPrice ASC")
+    fun getAllVirtualGifts(): Flow<List<VirtualGift>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertVirtualGift(gift: VirtualGift)
+
+    @Update
+    suspend fun updateVirtualGift(gift: VirtualGift)
+
+    @Delete
+    suspend fun deleteVirtualGift(gift: VirtualGift)
+
+    // Gift Transactions
+    @Query("SELECT * FROM gift_transactions ORDER BY createdAt DESC")
+    fun getAllGiftTransactions(): Flow<List<GiftTransaction>>
+
+    @Query("SELECT * FROM gift_transactions WHERE creatorUserId = :creatorId ORDER BY createdAt DESC")
+    fun getCreatorGiftTransactions(creatorId: String): Flow<List<GiftTransaction>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertGiftTransaction(tx: GiftTransaction): Long
+
+    // Creator Wallet
+    @Query("SELECT * FROM creator_wallets WHERE userId = :userId LIMIT 1")
+    fun getCreatorWallet(userId: String): Flow<CreatorWallet?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrUpdateCreatorWallet(wallet: CreatorWallet)
+
+    // Withdrawal Requests
+    @Query("SELECT * FROM withdrawal_requests ORDER BY createdAt DESC")
+    fun getAllWithdrawalRequests(): Flow<List<WithdrawalRequest>>
+
+    @Query("SELECT * FROM withdrawal_requests WHERE userId = :userId ORDER BY createdAt DESC")
+    fun getUserWithdrawalRequests(userId: String): Flow<List<WithdrawalRequest>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertWithdrawalRequest(req: WithdrawalRequest): Long
+
+    @Update
+    suspend fun updateWithdrawalRequest(req: WithdrawalRequest)
+
+    // --- LIVE STREAMING SYSTEM DAOS ---
+
+    // Live Streams
+    @Query("SELECT * FROM live_streams WHERE status = 'LIVE' ORDER BY startedAt DESC")
+    fun getActiveLiveStreams(): Flow<List<LiveStream>>
+
+    @Query("SELECT * FROM live_streams ORDER BY startedAt DESC")
+    fun getAllLiveStreams(): Flow<List<LiveStream>>
+
+    @Query("SELECT * FROM live_streams WHERE id = :streamId LIMIT 1")
+    fun getLiveStreamById(streamId: Int): Flow<LiveStream?>
+
+    @Query("SELECT * FROM live_streams WHERE creatorUserId = :userId AND status = 'LIVE' LIMIT 1")
+    suspend fun getActiveLiveStreamByCreator(userId: String): LiveStream?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLiveStream(stream: LiveStream): Long
+
+    @Update
+    suspend fun updateLiveStream(stream: LiveStream)
+
+    @Query("DELETE FROM live_streams WHERE id = :streamId")
+    suspend fun deleteLiveStreamById(streamId: Int)
+
+    // Live Chat Messages
+    @Query("SELECT * FROM live_chat_messages WHERE streamId = :streamId ORDER BY timestamp ASC")
+    fun getLiveChatMessages(streamId: Int): Flow<List<LiveChatMessage>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLiveChatMessage(msg: LiveChatMessage): Long
+
+    @Update
+    suspend fun updateLiveChatMessage(msg: LiveChatMessage)
+
+    @Query("DELETE FROM live_chat_messages WHERE id = :messageId")
+    suspend fun deleteLiveChatMessage(messageId: Int)
+
+    // Live Viewers
+    @Query("SELECT * FROM live_viewers WHERE streamId = :streamId")
+    fun getLiveViewers(streamId: Int): Flow<List<LiveViewer>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrUpdateLiveViewer(viewer: LiveViewer): Long
+
+    @Query("DELETE FROM live_viewers WHERE streamId = :streamId AND userId = :userId")
+    suspend fun removeLiveViewer(streamId: Int, userId: String)
+
+    // Live Moderators
+    @Query("SELECT * FROM live_moderators WHERE streamId = :streamId")
+    fun getLiveModerators(streamId: Int): Flow<List<LiveModerator>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLiveModerator(mod: LiveModerator)
+
+    @Query("DELETE FROM live_moderators WHERE streamId = :streamId AND userId = :userId")
+    suspend fun removeLiveModerator(streamId: Int, userId: String)
+
+    // Live Reports
+    @Query("SELECT * FROM live_reports ORDER BY timestamp DESC")
+    fun getAllLiveReports(): Flow<List<LiveReport>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLiveReport(report: LiveReport): Long
+
+    @Update
+    suspend fun updateLiveReport(report: LiveReport)
+
+    // Live Analytics
+    @Query("SELECT * FROM live_analytics WHERE streamId = :streamId LIMIT 1")
+    fun getLiveAnalytics(streamId: Int): Flow<LiveAnalytics?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrUpdateLiveAnalytics(analytics: LiveAnalytics)
 }
+
 

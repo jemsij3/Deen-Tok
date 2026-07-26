@@ -19,3 +19,13 @@ val TextMuted = Color(0xFF71717A) // Zinc 500
 
 val LikeRed = Color(0xFFEF4444) // Red 500
 
+// Economy & Live Streaming Colors
+val GoldYellow = Color(0xFFFFD700)
+val DarkGold = Color(0xFFFFB300)
+val TelebirrBlue = Color(0xFF0072CE)
+val CbePurple = Color(0xFF5E17EB)
+val CardDarkBg = Color(0xFF1E1E28)
+val EmeraldGreen = Color(0xFF00C853)
+val DarkNavy = Color(0xFF0F172A)
+val LiveRed = Color(0xFFE53935)
+val SoftBlack = Color(0xFF121212)
