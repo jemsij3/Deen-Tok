@@ -75,6 +75,7 @@ fun MainAppScreen(viewModel: DeenTokViewModel) {
     val allVideos by viewModel.allVideos.collectAsState()
     val unreadNotifications by viewModel.allNotifications.collectAsState()
     val activeGiftAnimation by viewModel.activeGiftAnimation.collectAsState()
+    var isFullscreenPreview by remember { mutableStateOf(false) }
     
     val unreadCount = unreadNotifications.count { !it.isRead }
 
@@ -84,7 +85,7 @@ fun MainAppScreen(viewModel: DeenTokViewModel) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val isWideScreen = maxWidth >= 720.dp
 
-            if (isWideScreen) {
+            if (isWideScreen && !isFullscreenPreview) {
                 // Desktop / Tablet Landscape Layout with TikTok-style Left Navigation Sidebar
                 Row(
                     modifier = Modifier
@@ -137,19 +138,35 @@ fun MainAppScreen(viewModel: DeenTokViewModel) {
                                 DesktopSidebarItem("Admin Dashboard", Screen.ADMIN_DASHBOARD, Icons.Default.AdminPanelSettings, currentScreen) { viewModel.setScreen(Screen.ADMIN_DASHBOARD) }
                             }
 
-                            // Footer: Coin Wallet button
-                            OutlinedButton(
-                                onClick = { viewModel.setScreen(Screen.WALLET) },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(1.dp, Color(0xFFD4AF37))
-                            ) {
-                                Text("🪙 Deen Coins", color = Color(0xFFD4AF37), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                // Dedicated Full Screen Preview Mode Toggle
+                                OutlinedButton(
+                                    onClick = { isFullscreenPreview = true },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("sidebar_fullscreen_preview_button"),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = BorderStroke(1.dp, CyanAccent)
+                                ) {
+                                    Icon(Icons.Default.Fullscreen, contentDescription = "Full Screen", tint = CyanAccent, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("⛶ Full Screen", color = CyanAccent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+
+                                // Footer: Coin Wallet button
+                                OutlinedButton(
+                                    onClick = { viewModel.setScreen(Screen.WALLET) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = BorderStroke(1.dp, Color(0xFFD4AF37))
+                                ) {
+                                    Text("🪙 Deen Coins", color = Color(0xFFD4AF37), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                }
                             }
                         }
                     }
 
-                    // Main Content Stage
+                    // Main Content Stage: Fully expands to fill available display space!
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -157,19 +174,24 @@ fun MainAppScreen(viewModel: DeenTokViewModel) {
                         contentAlignment = Alignment.Center
                     ) {
                         Box(
-                            modifier = if (currentScreen == Screen.HOME) Modifier.widthIn(max = 500.dp).fillMaxHeight() else Modifier.fillMaxSize()
+                            modifier = Modifier.fillMaxSize()
                         ) {
-                            ScreenContent(currentScreen, viewModel)
+                            ScreenContent(
+                                currentScreen = currentScreen,
+                                viewModel = viewModel,
+                                isFullscreen = isFullscreenPreview,
+                                onToggleFullscreen = { isFullscreenPreview = !isFullscreenPreview }
+                            )
                         }
                     }
                 }
             } else {
-                // Mobile Handheld Layout
+                // Mobile Handheld or Immersive Full Screen Layout
                 Scaffold(
                     bottomBar = {
-                        if (currentScreen == Screen.HOME || currentScreen == Screen.EXPLORE || 
+                        if (!isFullscreenPreview && (currentScreen == Screen.HOME || currentScreen == Screen.EXPLORE || 
                             currentScreen == Screen.UPLOAD || currentScreen == Screen.MESSAGES || 
-                            currentScreen == Screen.PROFILE) {
+                            currentScreen == Screen.PROFILE)) {
                             DeenTokBottomNavigation(
                                 currentScreen = currentScreen,
                                 unreadCount = unreadCount,
@@ -184,9 +206,14 @@ fun MainAppScreen(viewModel: DeenTokViewModel) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(bottom = if (shouldShowNavBar(currentScreen)) innerPadding.calculateBottomPadding() else 0.dp)
+                            .padding(bottom = if (!isFullscreenPreview && shouldShowNavBar(currentScreen) && currentScreen != Screen.HOME) innerPadding.calculateBottomPadding() else 0.dp)
                     ) {
-                        ScreenContent(currentScreen, viewModel)
+                        ScreenContent(
+                            currentScreen = currentScreen,
+                            viewModel = viewModel,
+                            isFullscreen = isFullscreenPreview,
+                            onToggleFullscreen = { isFullscreenPreview = !isFullscreenPreview }
+                        )
                     }
                 }
             }
@@ -201,9 +228,18 @@ fun MainAppScreen(viewModel: DeenTokViewModel) {
 }
 
 @Composable
-private fun ScreenContent(currentScreen: Screen, viewModel: DeenTokViewModel) {
+private fun ScreenContent(
+    currentScreen: Screen,
+    viewModel: DeenTokViewModel,
+    isFullscreen: Boolean = false,
+    onToggleFullscreen: () -> Unit = {}
+) {
     when (currentScreen) {
-        Screen.HOME -> FeedScreen(viewModel)
+        Screen.HOME -> FeedScreen(
+            viewModel = viewModel,
+            isFullscreen = isFullscreen,
+            onToggleFullscreen = onToggleFullscreen
+        )
         Screen.EXPLORE -> ExploreScreen(viewModel)
         Screen.UPLOAD -> UploadScreen(viewModel)
         Screen.LIVE -> LiveStreamScreen(viewModel)
@@ -260,7 +296,11 @@ private fun shouldShowNavBar(screen: Screen): Boolean {
 
 // 1. HOME SCREEN (FOR YOU / FOLLOWING FEEDS)
 @Composable
-fun FeedScreen(viewModel: DeenTokViewModel) {
+fun FeedScreen(
+    viewModel: DeenTokViewModel,
+    isFullscreen: Boolean = false,
+    onToggleFullscreen: () -> Unit = {}
+) {
     val allVideos by viewModel.allVideos.collectAsState()
     val homeTab by viewModel.homeTab.collectAsState()
     val activeVideoIdForComments by viewModel.activeVideoIdForComments.collectAsState()
@@ -329,6 +369,8 @@ fun FeedScreen(viewModel: DeenTokViewModel) {
                     onLike = { viewModel.toggleLike(currentVideo) },
                     onFollow = { viewModel.toggleFollow(currentVideo) },
                     onCommentClick = { viewModel.setActiveVideoForComments(currentVideo.id) },
+                    onToggleFullscreen = onToggleFullscreen,
+                    isFullscreen = isFullscreen,
                     onSwipeUp = {
                         if (currentVideoIndex < filteredVideos.size - 1) {
                             currentVideoIndex++
@@ -432,22 +474,42 @@ fun FeedScreen(viewModel: DeenTokViewModel) {
                 }
             }
 
-            // Right: Search Quick Shortcut Button
-            IconButton(
-                onClick = { viewModel.setScreen(Screen.EXPLORE) },
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .testTag("home_search_shortcut")
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(Black.copy(alpha = 0.3f))
+            // Right: Fullscreen Toggle & Search Shortcuts
+            Row(
+                modifier = Modifier.align(Alignment.CenterEnd),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = "Search",
-                    tint = TextWhite,
-                    modifier = Modifier.size(20.dp)
-                )
+                IconButton(
+                    onClick = onToggleFullscreen,
+                    modifier = Modifier
+                        .testTag("feed_fullscreen_button")
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(Black.copy(alpha = 0.3f))
+                ) {
+                    Icon(
+                        imageVector = if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                        contentDescription = "Toggle Fullscreen Preview",
+                        tint = TextWhite,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                IconButton(
+                    onClick = { viewModel.setScreen(Screen.EXPLORE) },
+                    modifier = Modifier
+                        .testTag("home_search_shortcut")
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(Black.copy(alpha = 0.3f))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "Search",
+                        tint = TextWhite,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
 
@@ -471,7 +533,9 @@ fun VideoPlayerCard(
     onFollow: () -> Unit,
     onCommentClick: () -> Unit,
     onSwipeUp: () -> Unit,
-    onSwipeDown: () -> Unit
+    onSwipeDown: () -> Unit,
+    onToggleFullscreen: () -> Unit = {},
+    isFullscreen: Boolean = false
 ) {
     val isVideoMuted by viewModel.isVideoMuted.collectAsState()
     val videoVolume by viewModel.videoVolume.collectAsState()
@@ -795,6 +859,29 @@ fun VideoPlayerCard(
                 }
                 Text(
                     text = formatCount(video.sharesCount),
+                    color = TextWhite,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            // Fullscreen Preview Toggle Action
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                IconButton(
+                    onClick = { onToggleFullscreen() },
+                    modifier = Modifier
+                        .testTag("fullscreen_button")
+                        .size(44.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                        contentDescription = "Full Screen Preview",
+                        tint = CyanAccent,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+                Text(
+                    text = if (isFullscreen) "Exit" else "Full",
                     color = TextWhite,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold

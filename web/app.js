@@ -542,6 +542,16 @@ function renderVideoFeed() {
             </div>
             <span class="action-label-stat">${formatMetric(currentVideo.sharesCount)}</span>
           </button>
+
+          <!-- Fullscreen Preview Button -->
+          <button class="action-btn-item" onclick="toggleFullscreenFeed()" title="Toggle Fullscreen Preview">
+            <div class="action-circle-icon" style="color:var(--emerald-light);">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+              </svg>
+            </div>
+            <span class="action-label-stat">Full</span>
+          </button>
         </div>
       </div>
     </div>
@@ -649,6 +659,22 @@ function shareVideo(videoId) {
     showToast('Link copied to clipboard! 📋');
   } else {
     showToast(`Share link: ${shareUrl}`);
+  }
+}
+
+function toggleFullscreenFeed() {
+  document.body.classList.toggle('fullscreen-feed-active');
+  const isFull = document.body.classList.contains('fullscreen-feed-active');
+  if (isFull) {
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+    showToast('Full Screen Preview Enabled ⛶');
+  } else {
+    if (document.exitFullscreen && document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
+    showToast('Exited Full Screen');
   }
 }
 
