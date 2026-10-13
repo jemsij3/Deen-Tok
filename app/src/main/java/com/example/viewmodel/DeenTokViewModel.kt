@@ -30,7 +30,7 @@ enum class Screen {
 class DeenTokViewModel(private val repository: DeenTokRepository) : ViewModel() {
 
     // Authentication State
-    private val _isLoggedIn = MutableStateFlow(false)
+    private val _isLoggedIn = MutableStateFlow(true)
     val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
 
     // Selected Language State
@@ -428,30 +428,42 @@ class DeenTokViewModel(private val repository: DeenTokRepository) : ViewModel() 
 
     init {
         viewModelScope.launch {
-            repository.prepopulateIfNeeded()
-            userPreferences.collect { prefs ->
-                if (prefs != null) {
-                    _selectedLanguage.value = prefs.language
+            try {
+                repository.prepopulateIfNeeded()
+                userPreferences.collect { prefs ->
+                    if (prefs != null) {
+                        _selectedLanguage.value = prefs.language
+                    }
                 }
+            } catch (e: Throwable) {
+                android.util.Log.e("DeenTok", "Init prepopulate error", e)
             }
         }
         viewModelScope.launch {
-            repository.allUsers.collect { users ->
-                val me = users.firstOrNull { it.userId == "current_user" }
-                if (me != null) {
-                    currentUsername = me.username
-                    currentUserAvatar = me.avatarUrl
-                    currentUserBio = me.bio
-                    currentUserWebsite = me.website
-                    currentUserTwitter = me.twitter
-                    currentUserInstagram = me.instagram
+            try {
+                repository.allUsers.collect { users ->
+                    val me = users.firstOrNull { it.userId == "current_user" }
+                    if (me != null) {
+                        currentUsername = me.username
+                        currentUserAvatar = me.avatarUrl
+                        currentUserBio = me.bio
+                        currentUserWebsite = me.website
+                        currentUserTwitter = me.twitter
+                        currentUserInstagram = me.instagram
+                    }
                 }
+            } catch (e: Throwable) {
+                android.util.Log.e("DeenTok", "Init users error", e)
             }
         }
         viewModelScope.launch {
-            repository.allVideos.collect { videos ->
-                val followingCount = videos.filter { it.isFollowingCreator }.map { it.username }.distinct().size
-                currentUserFollowingCount = followingCount.toString()
+            try {
+                repository.allVideos.collect { videos ->
+                    val followingCount = videos.filter { it.isFollowingCreator }.map { it.username }.distinct().size
+                    currentUserFollowingCount = followingCount.toString()
+                }
+            } catch (e: Throwable) {
+                android.util.Log.e("DeenTok", "Init videos error", e)
             }
         }
     }

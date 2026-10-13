@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>DeenTok - Beneficial Islamic Reminders & Short Videos</title>
+  <meta name="description" content="A modern TikTok-style short-video social platform for sharing Quran recitations, Hadith gems, and Islamic knowledge.">
+  <link rel="stylesheet" href="styles.css">
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+  <!-- Desktop / Tablet Header -->
+  <header class="app-header desktop-only">
+    <div class="header-left">
+      <div class="brand-logo" onclick="navigateTo('home')">
+        <div class="logo-icon">
+          <svg viewBox="0 0 40 40" width="36" height="36">
+            <circle cx="20" cy="20" r="19" fill="#0F2E1E" stroke="#D4AF37" stroke-width="2"/>
+            <path d="M 23 10 A 11 11 0 1 0 23 30 A 8.5 8.5 0 1 1 23 10 Z" fill="#D4AF37"/>
+            <text x="21" y="26" font-family="Inter, sans-serif" font-weight="800" font-size="12" fill="#D4AF37" text-anchor="middle">DT</text>
+          </svg>
+        </div>
+        <span class="brand-name">Deen<span class="brand-accent">Tok</span></span>
+      </div>
+    </div>
+    
+    <div class="header-center">
+      <div class="search-bar-container">
+        <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="desktopSearchInput" placeholder="Search Quran, Hadith, creators, topics..." onkeydown="handleSearchKey(event)">
+        <button class="search-btn" onclick="executeSearch()">Search</button>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <button class="upload-btn-header" onclick="navigateTo('upload')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        <span>Upload</span>
+      </button>
+
+      <button class="header-icon-btn" onclick="navigateTo('messages')" title="Messages">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+        <span class="badge-dot" id="headerMsgBadge" style="display:none;"></span>
+      </button>
+
+      <button class="header-icon-btn" onclick="navigateTo('notifications')" title="Notifications">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
+        <span class="badge-dot" id="headerNotifBadge"></span>
+      </button>
+
+      <div class="user-menu-trigger" onclick="toggleUserDropdown()">
+        <img id="headerUserAvatar" class="avatar-sm" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" alt="Profile">
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Application Wrapper -->
+  <div class="app-layout">
+    <!-- Desktop Left Navigation Sidebar -->
+    <aside class="sidebar desktop-only">
+      <nav class="nav-menu">
+        <a class="nav-item active" id="sidebar-home" onclick="navigateTo('home')">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+          </svg>
+          <span>For You</span>
+        </a>
+
+        <a class="nav-item" id="sidebar-following" onclick="switchHomeTab('following')">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          <span>Following</span>
+        </a>
+
+        <a class="nav-item" id="sidebar-explore" onclick="navigateTo('explore')">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+          </svg>
+          <span>Explore</span>
+        </a>
+
+        <a class="nav-item" id="sidebar-live" onclick="navigateTo('live')">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 7l-7 5 7 5V7z"></path>
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+          </svg>
+          <span>LIVE Streams</span>
+          <span class="live-pill">LIVE</span>
+        </a>
+
+        <a class="nav-item" id="sidebar-profile" onclick="navigateTo('profile')">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+          <span>Profile</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="sidebar-section">
+        <h4 class="section-title">CREATOR & MORE</h4>
+        <a class="nav-item-sub" onclick="navigateTo('studio')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+          </svg>
+          <span>Creator Studio</span>
+        </a>
+        <a class="nav-item-sub" onclick="navigateTo('admin')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          <span>Admin Console</span>
+        </a>
+        <a class="nav-item-sub" onclick="openWalletModal()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+            <line x1="1" y1="10" x2="23" y2="10"></line>
+          </svg>
+          <span>Deen Coins & Wallet</span>
+        </a>
+      </div>
+
+      <div class="sidebar-section">
+        <h4 class="section-title">SUGGESTED CREATORS</h4>
+        <div id="suggestedCreatorsList" class="suggested-creators">
+          <!-- Injected via JS -->
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <p>© 2026 DeenTok Inc.</p>
+        <p class="arabic-text">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</p>
+        <p>Spread Peace, Share Knowledge</p>
+      </div>
+    </aside>
+
+    <!-- Content Stage Area -->
+    <main class="content-stage" id="mainContentStage">
+      <!-- 1. FEED SCREEN (FOR YOU / FOLLOWING) -->
+      <section id="screen-home" class="screen-view active">
+        <!-- Mobile Top Navigation Header -->
+        <div class="mobile-top-header mobile-only">
+          <div class="mobile-top-left" onclick="navigateTo('live')">
+            <span class="live-badge-sm">LIVE</span>
+          </div>
+          <div class="mobile-feed-tabs">
+            <button class="feed-tab-btn" id="mobileTabFollowing" onclick="switchHomeTab('following')">Following</button>
+            <span class="tab-separator">|</span>
+            <button class="feed-tab-btn active" id="mobileTabForYou" onclick="switchHomeTab('foryou')">For You</button>
+          </div>
+          <div class="mobile-top-right" onclick="navigateTo('explore')">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Video Feed Container -->
+        <div class="feed-container" id="videoFeedContainer">
+          <!-- Video Cards will be rendered dynamically -->
+        </div>
+
+        <!-- Desktop Navigation Controls for Video -->
+        <div class="desktop-feed-controls desktop-only">
+          <button class="control-arrow-btn" onclick="prevVideo()" title="Previous Video (Arrow Up)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"></polyline></svg>
+          </button>
+          <button class="control-arrow-btn" onclick="nextVideo()" title="Next Video (Arrow Down)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- 2. EXPLORE & SEARCH SCREEN -->
+      <section id="screen-explore" class="screen-view">
+        <div class="explore-wrapper">
+          <div class="explore-search-header">
+            <h2>Discover Beneficial Reminders</h2>
+            <div class="category-pills" id="categoryPillsContainer">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+          <div class="video-grid" id="exploreVideoGrid">
+            <!-- Rendered via JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. UPLOAD SCREEN -->
+      <section id="screen-upload" class="screen-view">
+        <div class="upload-container">
+          <div class="upload-card">
+            <div class="upload-header">
+              <h2>Upload Video to DeenTok</h2>
+              <p>Share Quran recitations, Sunnah reminders, and Islamic knowledge with the Ummah</p>
+            </div>
+
+            <div class="upload-body">
+              <div class="drop-zone" id="dropZone" onclick="triggerFileInput()">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <p class="drop-title">Select video to upload</p>
+                <p class="drop-sub">Or drag and drop a file (MP4, WebM)</p>
+                <p class="drop-specs">720x1280 resolution or higher • Up to 60 seconds</p>
+                <input type="file" id="videoFileInput" accept="video/*,image/*" style="display:none;" onchange="handleFileSelect(event)">
+              </div>
+
+              <div class="upload-form">
+                <div class="form-group">
+                  <label>Title *</label>
+                  <input type="text" id="uploadTitle" placeholder="e.g. Beautiful Surah Al-Mulk Recitation 📖">
+                </div>
+
+                <div class="form-group">
+                  <label>Caption & Hashtags</label>
+                  <textarea id="uploadDescription" rows="3" placeholder="Recitation by Sheikh Mishary. #quran #peace #reminders"></textarea>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group half">
+                    <label>Category</label>
+                    <select id="uploadCategory">
+                      <option value="Quran">Quran Recitation</option>
+                      <option value="Hadith">Hadith Gems</option>
+                      <option value="Dua">Dua & Supplication</option>
+                      <option value="Islamic History">Islamic History</option>
+                      <option value="Reminders">Daily Reminders</option>
+                    </select>
+                  </div>
+                  <div class="form-group half">
+                    <label>Audio / Nasheed / Reciter</label>
+                    <input type="text" id="uploadMusic" placeholder="e.g. Original Audio - Sheikh Al-Afasy">
+                  </div>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group half">
+                    <label>Reference (Surah / Hadith Book)</label>
+                    <input type="text" id="uploadRef" placeholder="e.g. Surah 67:1-5 / Sahih Bukhari 1">
+                  </div>
+                  <div class="form-group half">
+                    <label>Thumbnail Image URL (Optional)</label>
+                    <input type="text" id="uploadThumbUrl" placeholder="https://images.unsplash.com/...">
+                  </div>
+                </div>
+
+                <div class="upload-actions">
+                  <button class="btn-cancel" onclick="navigateTo('home')">Discard</button>
+                  <button class="btn-primary" onclick="publishVideo()">Post Video</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. LIVE SCREEN -->
+      <section id="screen-live" class="screen-view">
+        <div class="live-wrapper">
+          <div class="live-header-bar">
+            <h2>LIVE Streams & Halal Circles</h2>
+            <button class="btn-primary-sm" onclick="startHostStream()">Go LIVE</button>
+          </div>
+          <div class="live-grid" id="liveStreamsGrid">
+            <!-- Injected via JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. MESSAGES & INBOX SCREEN -->
+      <section id="screen-messages" class="screen-view">
+        <div class="messages-container">
+          <div class="messages-sidebar">
+            <div class="messages-header">
+              <h3>Messages</h3>
+            </div>
+            <div class="conversations-list" id="conversationsList">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+          <div class="chat-main" id="chatMainArea">
+            <div class="chat-header" id="chatHeader">
+              <span id="chatActiveUser">Select a conversation</span>
+            </div>
+            <div class="chat-messages-scroll" id="chatMessagesScroll">
+              <!-- Rendered via JS -->
+            </div>
+            <div class="chat-input-bar">
+              <input type="text" id="chatMsgInput" placeholder="Send a beneficial message..." onkeydown="handleChatKey(event)">
+              <button class="btn-send" onclick="sendDirectMessage()">Send</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. NOTIFICATIONS SCREEN -->
+      <section id="screen-notifications" class="screen-view">
+        <div class="notif-wrapper">
+          <div class="notif-header">
+            <h2>All Activity</h2>
+            <button class="btn-text" onclick="markAllNotificationsRead()">Mark all as read</button>
+          </div>
+          <div class="notif-list" id="notifListContainer">
+            <!-- Injected via JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- 7. PROFILE SCREEN -->
+      <section id="screen-profile" class="screen-view">
+        <div class="profile-container">
+          <div class="profile-header-card">
+            <div class="profile-top-row">
+              <img id="profileAvatar" class="avatar-xl" src="" alt="Avatar">
+              <div class="profile-main-meta">
+                <div class="username-badge">
+                  <h2 id="profileUsername">@username</h2>
+                  <span id="profileVerifiedBadge" class="verified-badge" style="display:none;">✓</span>
+                </div>
+                <h3 id="profileFullName" class="profile-fullname">User Full Name</h3>
+                <div class="profile-action-buttons">
+                  <button class="btn-outline" onclick="openEditProfileModal()">Edit Profile</button>
+                  <button class="btn-outline-icon" onclick="openWalletModal()" title="Wallet">🪙</button>
+                  <button class="btn-outline-icon" onclick="navigateTo('settings')" title="Settings">⚙️</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="profile-stats-row">
+              <div class="stat-item"><strong id="profileFollowingCount">0</strong><span>Following</span></div>
+              <div class="stat-item"><strong id="profileFollowersCount">0</strong><span>Followers</span></div>
+              <div class="stat-item"><strong id="profileLikesCount">0</strong><span>Likes</span></div>
+            </div>
+
+            <p id="profileBio" class="profile-bio-text">No bio yet.</p>
+          </div>
+
+          <div class="profile-tabs">
+            <button class="tab-btn active" id="tabMyVideos" onclick="switchProfileTab('videos')">Videos</button>
+            <button class="tab-btn" id="tabLikedVideos" onclick="switchProfileTab('liked')">Liked</button>
+            <button class="tab-btn" id="tabSavedVideos" onclick="switchProfileTab('saved')">Saved</button>
+          </div>
+
+          <div class="profile-video-grid" id="profileVideoGrid">
+            <!-- Injected via JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- 8. ADMIN DASHBOARD SCREEN -->
+      <section id="screen-admin" class="screen-view">
+        <div class="admin-wrapper">
+          <div class="admin-top-bar">
+            <h2>DeenTok Admin Studio & Moderation Console</h2>
+            <span class="role-badge">Super Admin</span>
+          </div>
+
+          <div class="admin-stats-grid">
+            <div class="stat-card">
+              <span class="card-label">Total Users</span>
+              <span class="card-val" id="adminTotalUsers">0</span>
+            </div>
+            <div class="stat-card">
+              <span class="card-label">Total Videos</span>
+              <span class="card-val" id="adminTotalVideos">0</span>
+            </div>
+            <div class="stat-card">
+              <span class="card-label">Pending Reports</span>
+              <span class="card-val warning" id="adminPendingReports">0</span>
+            </div>
+            <div class="stat-card">
+              <span class="card-label">Active Advertisements</span>
+              <span class="card-val" id="adminActiveAds">0</span>
+            </div>
+          </div>
+
+          <div class="admin-tabs">
+            <button class="admin-tab active" onclick="switchAdminTab('users')">Users Management</button>
+            <button class="admin-tab" onclick="switchAdminTab('videos')">Videos Moderation</button>
+            <button class="admin-tab" onclick="switchAdminTab('reports')">Reports</button>
+            <button class="admin-tab" onclick="switchAdminTab('ads')">Ads & Sponsored</button>
+          </div>
+
+          <div class="admin-table-container" id="adminTableContainer">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </section>
+
+      <!-- 9. CREATOR STUDIO -->
+      <section id="screen-studio" class="screen-view">
+        <div class="studio-wrapper">
+          <h2>Creator Studio & Content Analytics</h2>
+          <div class="studio-cards">
+            <div class="studio-card">
+              <h3>Monthly Performance</h3>
+              <p>Views: <strong>48,920</strong></p>
+              <p>Shares: <strong>1,420</strong></p>
+              <p>Engagement Rate: <strong>8.4%</strong></p>
+            </div>
+            <div class="studio-card">
+              <h3>Creator Fund & Tips</h3>
+              <p>Earned Coins: <strong>12,450 🪙</strong></p>
+              <p>Withdrawable: <strong>$124.50 USD</strong></p>
+              <button class="btn-primary-sm" onclick="requestWithdrawal()">Request Payout</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 10. SETTINGS SCREEN -->
+      <section id="screen-settings" class="screen-view">
+        <div class="settings-container">
+          <h2>Settings & Privacy</h2>
+          <div class="settings-group">
+            <h3>Language & Regional</h3>
+            <div class="setting-item">
+              <span>App Language</span>
+              <select id="settingsLanguage" onchange="changeLanguage(this.value)">
+                <option value="English">English</option>
+                <option value="Arabic">العربية (Arabic)</option>
+                <option value="Urdu">اردو (Urdu)</option>
+                <option value="Turkish">Türkçe (Turkish)</option>
+              </select>
+            </div>
+          </div>
+          <div class="settings-group">
+            <h3>Content Preferences</h3>
+            <div class="setting-item">
+              <span>Autoplay Videos on Desktop</span>
+              <input type="checkbox" id="settingAutoplay" checked>
+            </div>
+            <div class="setting-item">
+              <span>Beneficial Reminders Notifications</span>
+              <input type="checkbox" id="settingNotif" checked>
+            </div>
+          </div>
+          <div class="settings-group">
+            <h3>Account Role Switcher</h3>
+            <div class="role-selector">
+              <button class="btn-outline-sm" onclick="switchRole('USER')">Switch to Normal User</button>
+              <button class="btn-outline-sm" onclick="switchRole('CREATOR')">Switch to Creator</button>
+              <button class="btn-outline-sm" onclick="switchRole('ADMIN')">Switch to Admin</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Mobile Bottom Navigation Bar -->
+  <nav class="mobile-bottom-nav mobile-only">
+    <button class="mobile-nav-item active" id="mob-nav-home" onclick="navigateTo('home')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+      </svg>
+      <span>Home</span>
+    </button>
+
+    <button class="mobile-nav-item" id="mob-nav-explore" onclick="navigateTo('explore')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+      </svg>
+      <span>Explore</span>
+    </button>
+
+    <button class="mobile-nav-item upload-special" onclick="navigateTo('upload')">
+      <div class="upload-icon-box">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+      </div>
+    </button>
+
+    <button class="mobile-nav-item" id="mob-nav-messages" onclick="navigateTo('messages')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+      </svg>
+      <span>Inbox</span>
+    </button>
+
+    <button class="mobile-nav-item" id="mob-nav-profile" onclick="navigateTo('profile')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+        <circle cx="12" cy="7" r="4"></circle>
+      </svg>
+      <span>Profile</span>
+    </button>
+  </nav>
+
+  <!-- MODALS & DRAWERS -->
+
+  <!-- Comments Drawer / Modal -->
+  <div class="modal-overlay" id="commentsModal" onclick="closeModalOnOverlay(event, 'commentsModal')">
+    <div class="comments-sheet">
+      <div class="comments-header">
+        <h3 id="commentsModalCount">Comments (0)</h3>
+        <button class="close-btn" onclick="closeCommentsModal()">✕</button>
+      </div>
+      <div class="comments-list" id="commentsListContainer">
+        <!-- Rendered via JS -->
+      </div>
+      <div class="comment-input-row">
+        <input type="text" id="newCommentInput" placeholder="Add a comment..." onkeydown="handleCommentKey(event)">
+        <button class="comment-submit-btn" onclick="submitNewComment()">Post</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Wallet & Gifting Modal -->
+  <div class="modal-overlay" id="walletModal" onclick="closeModalOnOverlay(event, 'walletModal')">
+    <div class="wallet-dialog">
+      <div class="modal-header">
+        <h3>Deen Coins Wallet</h3>
+        <button class="close-btn" onclick="closeWalletModal()">✕</button>
+      </div>
+      <div class="wallet-balance-box">
+        <p class="balance-label">Your Balance</p>
+        <div class="balance-amount"><span id="userCoinBalance">150</span> 🪙 Deen Coins</div>
+      </div>
+      <h4>Top Up Coins</h4>
+      <div class="coin-packages-grid">
+        <div class="package-card" onclick="purchaseCoins(70, 0.99)">
+          <span class="coin-num">70 🪙</span>
+          <span class="coin-price">$0.99</span>
+        </div>
+        <div class="package-card" onclick="purchaseCoins(350, 4.99)">
+          <span class="coin-num">350 🪙</span>
+          <span class="coin-price">$4.99</span>
+        </div>
+        <div class="package-card" onclick="purchaseCoins(1400, 19.99)">
+          <span class="coin-num">1,400 🪙</span>
+          <span class="coin-price">$19.99</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Send Gift Tray -->
+  <div class="modal-overlay" id="giftTrayModal" onclick="closeModalOnOverlay(event, 'giftTrayModal')">
+    <div class="gift-tray">
+      <div class="modal-header">
+        <h3>Send Islamic Gift to Creator</h3>
+        <button class="close-btn" onclick="closeGiftTray()">✕</button>
+      </div>
+      <div class="gifts-grid">
+        <div class="gift-item" onclick="sendGift('Heart', 5, '❤️')">
+          <span class="gift-emoji">❤️</span>
+          <span class="gift-name">Barakah Heart</span>
+          <span class="gift-cost">5 🪙</span>
+        </div>
+        <div class="gift-item" onclick="sendGift('Rose', 20, '🌹')">
+          <span class="gift-emoji">🌹</span>
+          <span class="gift-name">Sunnah Rose</span>
+          <span class="gift-cost">20 🪙</span>
+        </div>
+        <div class="gift-item" onclick="sendGift('Crescent', 50, '🌙')">
+          <span class="gift-emoji">🌙</span>
+          <span class="gift-name">Golden Moon</span>
+          <span class="gift-cost">50 🪙</span>
+        </div>
+        <div class="gift-item" onclick="sendGift('Kaaba Crystal', 100, '🕋')">
+          <span class="gift-emoji">🕋</span>
+          <span class="gift-name">Kaaba Crystal</span>
+          <span class="gift-cost">100 🪙</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Profile Modal -->
+  <div class="modal-overlay" id="editProfileModal" onclick="closeModalOnOverlay(event, 'editProfileModal')">
+    <div class="edit-profile-dialog">
+      <div class="modal-header">
+        <h3>Edit Profile</h3>
+        <button class="close-btn" onclick="closeEditProfileModal()">✕</button>
+      </div>
+      <div class="form-group">
+        <label>Display Name</label>
+        <input type="text" id="editDisplayName">
+      </div>
+      <div class="form-group">
+        <label>Bio</label>
+        <textarea id="editBio" rows="3"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Avatar URL</label>
+        <input type="text" id="editAvatarUrl">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeEditProfileModal()">Cancel</button>
+        <button class="btn-primary" onclick="saveProfileChanges()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fullscreen Animated Gift Banner Overlay -->
+  <div id="giftAnimationOverlay" class="gift-anim-overlay">
+    <div class="gift-anim-box">
+      <span class="anim-icon" id="animGiftEmoji">🌙</span>
+      <h2 id="animGiftSender">@user sent Golden Moon!</h2>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Core Web Application Script -->
+  <script src="app.js"></script>
+</body>
+</html>

@@ -81,41 +81,112 @@ fun MainAppScreen(viewModel: DeenTokViewModel) {
     if (!isLoggedIn) {
         WelcomeScreen(viewModel = viewModel)
     } else {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Scaffold(
-                bottomBar = {
-                    if (currentScreen == Screen.HOME || currentScreen == Screen.EXPLORE || 
-                        currentScreen == Screen.UPLOAD || currentScreen == Screen.MESSAGES || 
-                        currentScreen == Screen.PROFILE) {
-                        DeenTokBottomNavigation(
-                            currentScreen = currentScreen,
-                            unreadCount = unreadCount,
-                            viewModel = viewModel,
-                            onNavigate = { screen -> viewModel.setScreen(screen) }
-                        )
-                    }
-                },
-                containerColor = Black,
-                contentWindowInsets = WindowInsets.navigationBars
-            ) { innerPadding ->
-                Box(
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val isWideScreen = maxWidth >= 720.dp
+
+            if (isWideScreen) {
+                // Desktop / Tablet Landscape Layout with TikTok-style Left Navigation Sidebar
+                Row(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(bottom = if (shouldShowNavBar(currentScreen)) innerPadding.calculateBottomPadding() else 0.dp)
+                        .background(Black)
                 ) {
-                    when (currentScreen) {
-                        Screen.HOME -> FeedScreen(viewModel)
-                        Screen.EXPLORE -> ExploreScreen(viewModel)
-                        Screen.UPLOAD -> UploadScreen(viewModel)
-                        Screen.LIVE -> LiveStreamScreen(viewModel)
-                        Screen.MESSAGES -> MessagesScreen(viewModel)
-                        Screen.NOTIFICATIONS -> NotificationsSection(viewModel)
-                        Screen.PROFILE -> ProfileScreen(viewModel)
-                        Screen.SETTINGS -> SettingsScreen(viewModel)
-                        Screen.CREATOR_STUDIO -> CreatorStudioScreen(viewModel)
-                        Screen.ADMIN_DASHBOARD -> AdminDashboardScreen(viewModel)
-                        Screen.WALLET -> WalletScreen(viewModel, onBack = { viewModel.setScreen(Screen.PROFILE) })
-                        Screen.POLICY_CENTER -> PolicyCenterScreen(viewModel, onBack = { viewModel.setScreen(Screen.SETTINGS) })
+                    // Left Desktop Sidebar
+                    Surface(
+                        modifier = Modifier
+                            .width(230.dp)
+                            .fillMaxHeight(),
+                        color = Black,
+                        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.08f))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .statusBarsPadding()
+                                .navigationBarsPadding()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                // DeenTok Logo & Header
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { viewModel.setScreen(Screen.HOME) }
+                                        .padding(bottom = 14.dp)
+                                ) {
+                                    DeenTokLogo(sizeDp = 34.dp)
+                                    Text(
+                                        text = "DeenTok",
+                                        color = TextWhite,
+                                        fontSize = 20.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                DesktopSidebarItem("For You", Screen.HOME, Icons.Default.Home, currentScreen) { viewModel.setScreen(Screen.HOME) }
+                                DesktopSidebarItem("Explore", Screen.EXPLORE, Icons.Default.Explore, currentScreen) { viewModel.setScreen(Screen.EXPLORE) }
+                                DesktopSidebarItem("Upload", Screen.UPLOAD, Icons.Default.AddBox, currentScreen) { viewModel.setScreen(Screen.UPLOAD) }
+                                DesktopSidebarItem("LIVE Streams", Screen.LIVE, Icons.Default.LiveTv, currentScreen) { viewModel.setScreen(Screen.LIVE) }
+                                DesktopSidebarItem("Messages", Screen.MESSAGES, Icons.Default.Mail, currentScreen) { viewModel.setScreen(Screen.MESSAGES) }
+                                DesktopSidebarItem("Notifications", Screen.NOTIFICATIONS, Icons.Default.Notifications, currentScreen) { viewModel.setScreen(Screen.NOTIFICATIONS) }
+                                DesktopSidebarItem("Profile", Screen.PROFILE, Icons.Default.Person, currentScreen) { viewModel.setScreen(Screen.PROFILE) }
+                                DesktopSidebarItem("Creator Studio", Screen.CREATOR_STUDIO, Icons.Default.VideoCameraFront, currentScreen) { viewModel.setScreen(Screen.CREATOR_STUDIO) }
+                                DesktopSidebarItem("Admin Dashboard", Screen.ADMIN_DASHBOARD, Icons.Default.AdminPanelSettings, currentScreen) { viewModel.setScreen(Screen.ADMIN_DASHBOARD) }
+                            }
+
+                            // Footer: Coin Wallet button
+                            OutlinedButton(
+                                onClick = { viewModel.setScreen(Screen.WALLET) },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, Color(0xFFD4AF37))
+                            ) {
+                                Text("🪙 Deen Coins", color = Color(0xFFD4AF37), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
+                        }
+                    }
+
+                    // Main Content Stage
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = if (currentScreen == Screen.HOME) Modifier.widthIn(max = 500.dp).fillMaxHeight() else Modifier.fillMaxSize()
+                        ) {
+                            ScreenContent(currentScreen, viewModel)
+                        }
+                    }
+                }
+            } else {
+                // Mobile Handheld Layout
+                Scaffold(
+                    bottomBar = {
+                        if (currentScreen == Screen.HOME || currentScreen == Screen.EXPLORE || 
+                            currentScreen == Screen.UPLOAD || currentScreen == Screen.MESSAGES || 
+                            currentScreen == Screen.PROFILE) {
+                            DeenTokBottomNavigation(
+                                currentScreen = currentScreen,
+                                unreadCount = unreadCount,
+                                viewModel = viewModel,
+                                onNavigate = { screen -> viewModel.setScreen(screen) }
+                            )
+                        }
+                    },
+                    containerColor = Black,
+                    contentWindowInsets = WindowInsets.navigationBars
+                ) { innerPadding ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = if (shouldShowNavBar(currentScreen)) innerPadding.calculateBottomPadding() else 0.dp)
+                    ) {
+                        ScreenContent(currentScreen, viewModel)
                     }
                 }
             }
@@ -126,6 +197,58 @@ fun MainAppScreen(viewModel: DeenTokViewModel) {
                 onDismiss = { viewModel.clearActiveGiftAnimation() }
             )
         }
+    }
+}
+
+@Composable
+private fun ScreenContent(currentScreen: Screen, viewModel: DeenTokViewModel) {
+    when (currentScreen) {
+        Screen.HOME -> FeedScreen(viewModel)
+        Screen.EXPLORE -> ExploreScreen(viewModel)
+        Screen.UPLOAD -> UploadScreen(viewModel)
+        Screen.LIVE -> LiveStreamScreen(viewModel)
+        Screen.MESSAGES -> MessagesScreen(viewModel)
+        Screen.NOTIFICATIONS -> NotificationsSection(viewModel)
+        Screen.PROFILE -> ProfileScreen(viewModel)
+        Screen.SETTINGS -> SettingsScreen(viewModel)
+        Screen.CREATOR_STUDIO -> CreatorStudioScreen(viewModel)
+        Screen.ADMIN_DASHBOARD -> AdminDashboardScreen(viewModel)
+        Screen.WALLET -> WalletScreen(viewModel, onBack = { viewModel.setScreen(Screen.PROFILE) })
+        Screen.POLICY_CENTER -> PolicyCenterScreen(viewModel, onBack = { viewModel.setScreen(Screen.SETTINGS) })
+    }
+}
+
+@Composable
+private fun DesktopSidebarItem(
+    title: String,
+    screen: Screen,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    currentScreen: Screen,
+    onClick: () -> Unit
+) {
+    val isSelected = currentScreen == screen
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (isSelected) CyanAccent.copy(alpha = 0.15f) else Color.Transparent)
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp, vertical = 9.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = title,
+            tint = if (isSelected) CyanAccent else TextWhite,
+            modifier = Modifier.size(19.dp)
+        )
+        Text(
+            text = title,
+            color = if (isSelected) CyanAccent else TextWhite,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+            fontSize = 13.sp
+        )
     }
 }
 
@@ -9931,10 +10054,24 @@ fun WelcomeScreen(viewModel: DeenTokViewModel) {
                         )
                     }
                     
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    TextButton(
+                        onClick = { viewModel.signUp() },
+                        modifier = Modifier.testTag("welcome_guest_button")
+                    ) {
+                        Text(
+                            text = "Browse DeenTok as Guest →",
+                            color = CyanAccent,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
                     
                     Text(
-                        text = "v1.1.0 Stable • Decentralized Voice Core",
+                        text = "v1.1.0 Stable • DeenTok Core",
                         color = TextMuted,
                         fontSize = 11.sp,
                         letterSpacing = 0.5.sp

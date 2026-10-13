@@ -259,111 +259,110 @@ class DeenTokRepository(private val deenTokDao: DeenTokDao) {
     }
 
     suspend fun prepopulateIfNeeded() {
-        // Clear all videos initially to make the surface perfectly clear for real, perfect video posting!
-        deenTokDao.clearAllVideos()
+        try {
+            // Seed default Islamic videos if empty
+            val existingVideos = deenTokDao.getAllVideos().first()
+            if (existingVideos.isEmpty()) {
+                val defaultVideos = listOf(
+                    Video(
+                        id = 1,
+                        userId = "creator_1",
+                        username = "@quran_reminders",
+                        userAvatarUrl = "QR",
+                        videoUrl = "",
+                        thumbnailUrl = "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=300&q=80",
+                        title = "Beautiful Surah Ar-Rahman Recitation 📖✨",
+                        description = "Let the beautiful words of Surah Ar-Rahman soothe your soul. Verily, in the remembrance of Allah do hearts find rest. #quran #peace #deentok",
+                        likesCount = 2450,
+                        commentsCount = 3,
+                        sharesCount = 189,
+                        viewsCount = 5400,
+                        isPrivate = false,
+                        isLiked = false,
+                        isFollowingCreator = false,
+                        musicName = "Soothing Quran Recitation - Sheikh Mishary",
+                        category = "Quran",
+                        quranRef = "Surah Ar-Rahman (55:1-13)",
+                        contentType = "Quran"
+                    ),
+                    Video(
+                        id = 2,
+                        userId = "creator_2",
+                        username = "@sunnah_gems",
+                        userAvatarUrl = "SG",
+                        videoUrl = "",
+                        thumbnailUrl = "https://images.unsplash.com/photo-1519817650390-64a93db51149?auto=format&fit=crop&w=300&q=80",
+                        title = "Hadith on Kindness & Mercy ❤️",
+                        description = "Prophet Muhammad (ﷺ) said: 'Allah will not be merciful to those who are not merciful to people.' Let's spread love and compassion. #hadith #sunnah #mercy",
+                        likesCount = 1820,
+                        commentsCount = 0,
+                        sharesCount = 98,
+                        viewsCount = 3100,
+                        isPrivate = false,
+                        isLiked = false,
+                        isFollowingCreator = true,
+                        musicName = "Soft Ambient Nasheed Instrumental",
+                        category = "Hadith",
+                        hadithRef = "Sahih al-Bukhari 7376",
+                        contentType = "Hadith"
+                    ),
+                    Video(
+                        id = 3,
+                        userId = "creator_3",
+                        username = "@muslim_reminders",
+                        userAvatarUrl = "MR",
+                        videoUrl = "",
+                        thumbnailUrl = "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=300&q=80",
+                        title = "The Power of Sincere Dua 🤲🏽",
+                        description = "Allah says: 'Call upon Me; I will respond to you.' Never give up on your prayers. Your breakthrough is coming. #dua #prayer #trust",
+                        likesCount = 3110,
+                        commentsCount = 0,
+                        sharesCount = 275,
+                        viewsCount = 6800,
+                        isPrivate = false,
+                        isLiked = false,
+                        isFollowingCreator = false,
+                        musicName = "Beautiful Dua Melodic Background",
+                        category = "Dua",
+                        quranRef = "Surah Ghafir (40:60)",
+                        contentType = "Dua"
+                    ),
+                    Video(
+                        id = 4,
+                        userId = "creator_4",
+                        username = "@deen_history",
+                        userAvatarUrl = "DH",
+                        videoUrl = "",
+                        thumbnailUrl = "https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&w=300&q=80",
+                        title = "Islamic Golden Age: House of Wisdom 🏛️",
+                        description = "A short journey through the history of Baghdad's House of Wisdom, where science, mathematics, and translation flourished. #history #knowledge #scholars",
+                        likesCount = 1250,
+                        commentsCount = 0,
+                        sharesCount = 42,
+                        viewsCount = 2400,
+                        isPrivate = false,
+                        isLiked = false,
+                        isFollowingCreator = false,
+                        musicName = "Classical Oud Background",
+                        category = "Islamic History",
+                        sourceInfo = "Al-Khalili, Science and Islam",
+                        contentType = "Story"
+                    )
+                )
+                for (video in defaultVideos) {
+                    deenTokDao.insertVideo(video)
+                }
 
-        // Seed default Islamic videos
-        val defaultVideos = listOf(
-            Video(
-                id = 1,
-                userId = "creator_1",
-                username = "@quran_reminders",
-                userAvatarUrl = "QR",
-                videoUrl = "",
-                thumbnailUrl = "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=300&q=80",
-                title = "Beautiful Surah Ar-Rahman Recitation 📖✨",
-                description = "Let the beautiful words of Surah Ar-Rahman soothe your soul. Verily, in the remembrance of Allah do hearts find rest. #quran #peace #deentok",
-                likesCount = 2450,
-                commentsCount = 3,
-                sharesCount = 189,
-                viewsCount = 5400,
-                isPrivate = false,
-                isLiked = false,
-                isFollowingCreator = false,
-                musicName = "Soothing Quran Recitation - Sheikh Mishary",
-                category = "Quran",
-                quranRef = "Surah Ar-Rahman (55:1-13)",
-                contentType = "Quran"
-            ),
-            Video(
-                id = 2,
-                userId = "creator_2",
-                username = "@sunnah_gems",
-                userAvatarUrl = "SG",
-                videoUrl = "",
-                thumbnailUrl = "https://images.unsplash.com/photo-1519817650390-64a93db51149?auto=format&fit=crop&w=300&q=80",
-                title = "Hadith on Kindness & Mercy ❤️",
-                description = "Prophet Muhammad (ﷺ) said: 'Allah will not be merciful to those who are not merciful to people.' Let's spread love and compassion. #hadith #sunnah #mercy",
-                likesCount = 1820,
-                commentsCount = 0,
-                sharesCount = 98,
-                viewsCount = 3100,
-                isPrivate = false,
-                isLiked = false,
-                isFollowingCreator = true,
-                musicName = "Soft Ambient Nasheed Instrumental",
-                category = "Hadith",
-                hadithRef = "Sahih al-Bukhari 7376",
-                contentType = "Hadith"
-            ),
-            Video(
-                id = 3,
-                userId = "creator_3",
-                username = "@muslim_reminders",
-                userAvatarUrl = "MR",
-                videoUrl = "",
-                thumbnailUrl = "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=300&q=80",
-                title = "The Power of Sincere Dua 🤲🏽",
-                description = "Allah says: 'Call upon Me; I will respond to you.' Never give up on your prayers. Your breakthrough is coming. #dua #prayer #trust",
-                likesCount = 3110,
-                commentsCount = 0,
-                sharesCount = 275,
-                viewsCount = 6800,
-                isPrivate = false,
-                isLiked = false,
-                isFollowingCreator = false,
-                musicName = "Beautiful Dua Melodic Background",
-                category = "Dua",
-                quranRef = "Surah Ghafir (40:60)",
-                contentType = "Dua"
-            ),
-            Video(
-                id = 4,
-                userId = "creator_4",
-                username = "@deen_history",
-                userAvatarUrl = "DH",
-                videoUrl = "",
-                thumbnailUrl = "https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&w=300&q=80",
-                title = "Islamic Golden Age: House of Wisdom 🏛️",
-                description = "A short journey through the history of Baghdad's House of Wisdom, where science, mathematics, and translation flourished. #history #knowledge #scholars",
-                likesCount = 1250,
-                commentsCount = 0,
-                sharesCount = 42,
-                viewsCount = 2400,
-                isPrivate = false,
-                isLiked = false,
-                isFollowingCreator = false,
-                musicName = "Classical Oud Background",
-                category = "Islamic History",
-                sourceInfo = "Al-Khalili, Science and Islam",
-                contentType = "Story"
-            )
-        )
-        // For real posts, do not insert any default demo videos
-        // for (video in defaultVideos) {
-        //     deenTokDao.insertVideo(video)
-        // }
-
-        // Seed default comments for the first video
-        val defaultComments = listOf(
-            Comment(videoId = 1, username = "@marcus_dev", userAvatarUrl = "MD", text = "SubhanAllah, extremely beautiful recitation! Peace of mind."),
-            Comment(videoId = 1, username = "@alice_codes", userAvatarUrl = "AC", text = "This is indeed what my heart needed to hear today. Thank you for sharing!"),
-            Comment(videoId = 1, username = "@casual_scroll", userAvatarUrl = "CS", text = "Verily, in the remembrance of Allah do hearts find rest.")
-        )
-        // No default videos exist, so we do not seed comments for them initially
-        // for (comment in defaultComments) {
-        //     deenTokDao.insertComment(comment)
-        // }
+                // Seed default comments for the first video
+                val defaultComments = listOf(
+                    Comment(videoId = 1, username = "@marcus_dev", userAvatarUrl = "MD", text = "SubhanAllah, extremely beautiful recitation! Peace of mind."),
+                    Comment(videoId = 1, username = "@alice_codes", userAvatarUrl = "AC", text = "This is indeed what my heart needed to hear today. Thank you for sharing!"),
+                    Comment(videoId = 1, username = "@casual_scroll", userAvatarUrl = "CS", text = "Verily, in the remembrance of Allah do hearts find rest.")
+                )
+                for (comment in defaultComments) {
+                    deenTokDao.insertComment(comment)
+                }
+            }
 
         // Prepopulate notifications if empty
         val currentNotifications = deenTokDao.getAllNotifications().first()
@@ -637,6 +636,9 @@ class DeenTokRepository(private val deenTokDao: DeenTokDao) {
             if (stream.streamKey.startsWith("live_")) {
                 deenTokDao.deleteLiveStreamById(stream.id)
             }
+        }
+        } catch (e: Throwable) {
+            android.util.Log.e("DeenTok", "Prepopulation warning", e)
         }
     }
 
