@@ -1,0 +1,44 @@
+{
+  "users": [
+    {
+      "userId": "admin_user",
+      "username": "@me",
+      "email": "admin@deentok.org",
+      "passwordHash": "admin123",
+      "fullName": "Jemal Jima",
+      "avatarUrl": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
+      "role": "ADMIN",
+      "status": "ACTIVE",
+      "bio": "Platform Administrator. Beneficial reminders for the soul. Al-Qur'an & Sunnah learner. 🌙",
+      "followersCount": 1420,
+      "followingCount": 38,
+      "likesCount": 5210,
+      "isVerified": true
+    },
+    {
+      "userId": "creator_1",
+      "username": "@quran_reminders",
+      "email": "quran@deentok.org",
+      "passwordHash": "creator123",
+      "fullName": "Sheikh Mishary Reminders",
+      "avatarUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80",
+      "role": "CREATOR",
+      "status": "ACTIVE",
+      "bio": "Daily Quranic recitation & reflection. Verily in remembrance do hearts find rest.",
+      "followersCount": 28400,
+      "followingCount": 12,
+      "likesCount": 198000,
+      "isVerified": true
+    }
+  ],
+  "videos": [
+    {
+      "id": 999,
+      "title": "Test Video Persistence"
+    }
+  ],
+  "comments": [],
+  "messages": [],
+  "notifications": [],
+  "wallet": []
+}

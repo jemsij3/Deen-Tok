@@ -102,170 +102,9 @@ const DeenTokDB = {
   }
 };
 
-const DEFAULT_USERS = [
-  {
-    userId: 'admin_user',
-    username: '@me',
-    email: 'admin@deentok.org',
-    passwordHash: 'admin123',
-    fullName: 'Jemal Jima',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-    role: 'ADMIN',
-    status: 'ACTIVE',
-    bio: 'Platform Administrator. Beneficial reminders for the soul. Al-Qur\'an & Sunnah learner. 🌙',
-    followersCount: 1420,
-    followingCount: 38,
-    likesCount: 5210,
-    isVerified: true
-  },
-  {
-    userId: 'creator_1',
-    username: '@quran_reminders',
-    email: 'quran@deentok.org',
-    passwordHash: 'creator123',
-    fullName: 'Sheikh Mishary Reminders',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-    role: 'CREATOR',
-    status: 'ACTIVE',
-    bio: 'Daily Quranic recitation & reflection. Verily in remembrance do hearts find rest.',
-    followersCount: 28400,
-    followingCount: 12,
-    likesCount: 198000,
-    isVerified: true
-  },
-  {
-    userId: 'creator_2',
-    username: '@sunnah_gems',
-    email: 'sunnah@deentok.org',
-    passwordHash: 'creator123',
-    fullName: 'Sunnah Gems Official',
-    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
-    role: 'CREATOR',
-    status: 'ACTIVE',
-    bio: 'Authentic Hadith of Prophet Muhammad (ﷺ). Sharing knowledge with love and mercy.',
-    followersCount: 18900,
-    followingCount: 45,
-    likesCount: 112000,
-    isVerified: true
-  },
-  {
-    userId: 'creator_3',
-    username: '@muslim_reminders',
-    email: 'dua@deentok.org',
-    passwordHash: 'creator123',
-    fullName: 'Daily Duas & Supplications',
-    avatarUrl: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=200&q=80',
-    role: 'CREATOR',
-    status: 'ACTIVE',
-    bio: 'Power of sincere Dua. Never lose hope in the mercy of Allah. 🤲🏽',
-    followersCount: 31200,
-    followingCount: 20,
-    likesCount: 245000,
-    isVerified: false
-  },
-  {
-    userId: 'creator_4',
-    username: '@deen_history',
-    email: 'history@deentok.org',
-    passwordHash: 'creator123',
-    fullName: 'Islamic History & Wisdom',
-    avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80',
-    role: 'CREATOR',
-    status: 'ACTIVE',
-    bio: 'House of Wisdom, Islamic Golden Age, and inspiring stories of scholars.',
-    followersCount: 9400,
-    followingCount: 15,
-    likesCount: 43200,
-    isVerified: false
-  }
-];
 
-const DEFAULT_VIDEOS = [
-  {
-    id: 1,
-    userId: 'creator_1',
-    username: '@quran_reminders',
-    userAvatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-    videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-tree-branches-in-the-breeze-1188-large.mp4',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80',
-    title: 'Beautiful Surah Ar-Rahman Recitation 📖✨',
-    description: 'Let the beautiful words of Surah Ar-Rahman soothe your soul. Verily, in the remembrance of Allah do hearts find rest. #quran #peace #deentok',
-    likesCount: 2450,
-    commentsCount: 3,
-    sharesCount: 189,
-    viewsCount: 5400,
-    isLiked: false,
-    isSaved: false,
-    isFollowingCreator: false,
-    musicName: 'Soothing Quran Recitation - Sheikh Mishary',
-    category: 'Quran',
-    quranRef: 'Surah Ar-Rahman (55:1-13)',
-    createdAt: Date.now() - 1000 * 60 * 60 * 2
-  },
-  {
-    id: 2,
-    userId: 'creator_2',
-    username: '@sunnah_gems',
-    userAvatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
-    videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-clouds-and-blue-sky-2408-large.mp4',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1519817650390-64a93db51149?auto=format&fit=crop&w=600&q=80',
-    title: 'Hadith on Kindness & Mercy ❤️',
-    description: 'Prophet Muhammad (ﷺ) said: "Allah will not be merciful to those who are not merciful to people." Let\'s spread love and compassion. #hadith #sunnah #mercy',
-    likesCount: 1820,
-    commentsCount: 1,
-    sharesCount: 98,
-    viewsCount: 3100,
-    isLiked: false,
-    isSaved: true,
-    isFollowingCreator: true,
-    musicName: 'Soft Ambient Nasheed Instrumental',
-    category: 'Hadith',
-    hadithRef: 'Sahih al-Bukhari 7376',
-    createdAt: Date.now() - 1000 * 60 * 60 * 6
-  },
-  {
-    id: 3,
-    userId: 'creator_3',
-    username: '@muslim_reminders',
-    userAvatarUrl: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=200&q=80',
-    videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-stars-in-space-1610-large.mp4',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80',
-    title: 'The Power of Sincere Dua 🤲🏽',
-    description: 'Allah says: "Call upon Me; I will respond to you." Never give up on your prayers. Your breakthrough is coming. #dua #prayer #trust',
-    likesCount: 3110,
-    commentsCount: 2,
-    sharesCount: 275,
-    viewsCount: 6800,
-    isLiked: true,
-    isSaved: false,
-    isFollowingCreator: false,
-    musicName: 'Beautiful Dua Melodic Background',
-    category: 'Dua',
-    quranRef: 'Surah Ghafir (40:60)',
-    createdAt: Date.now() - 1000 * 60 * 60 * 18
-  },
-  {
-    id: 4,
-    userId: 'creator_4',
-    username: '@deen_history',
-    userAvatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80',
-    videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-set-of-plateaus-seen-from-the-sky-in-a-sunset-26070-large.mp4',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&w=600&q=80',
-    title: 'Islamic Golden Age: House of Wisdom 🏛️',
-    description: 'A short journey through the history of Baghdad\'s House of Wisdom, where science, mathematics, and translation flourished. #history #knowledge #scholars',
-    likesCount: 1250,
-    commentsCount: 0,
-    sharesCount: 42,
-    viewsCount: 2400,
-    isLiked: false,
-    isSaved: false,
-    isFollowingCreator: false,
-    musicName: 'Classical Oud Background',
-    category: 'Islamic History',
-    quranRef: '',
-    createdAt: Date.now() - 1000 * 60 * 60 * 36
-  }
-];
+
+
 
 const DEFAULT_COMMENTS = [
   {
@@ -425,7 +264,27 @@ const AppState = {
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', async () => {
-  await initDataStore();
+  try {
+    const res = await fetch('/api/data');
+    if (res.ok) {
+      const db = await res.json();
+      AppState.users = db.users || [];
+      AppState.videos = db.videos || [];
+      AppState.comments = db.comments || [];
+      AppState.messages = db.messages || [];
+      AppState.notifications = db.notifications || [];
+      AppState.userWallet = db.wallet || [];
+    }
+  } catch (err) {
+    console.error('Failed to load data from backend', err);
+  }
+
+  // Restore current user session from local storage id
+  const storedUserId = getLocalData(STORAGE_KEYS.CURRENT_USER_ID, null);
+  if (storedUserId) {
+    AppState.currentUser = AppState.users.find(u => u.userId === storedUserId) || null;
+  }
+
   setupEventListeners();
   renderApp();
   renderVideoFeed();
@@ -435,43 +294,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateHeaderAuthState();
 });
 
-async function initDataStore() {
-  await DeenTokDB.init();
-  AppState.users = getLocalData(STORAGE_KEYS.USERS, DEFAULT_USERS);
-  AppState.videos = getLocalData(STORAGE_KEYS.VIDEOS, DEFAULT_VIDEOS);
-  AppState.comments = getLocalData(STORAGE_KEYS.COMMENTS, DEFAULT_COMMENTS);
-  AppState.messages = getLocalData(STORAGE_KEYS.MESSAGES, DEFAULT_MESSAGES);
-  AppState.notifications = getLocalData(STORAGE_KEYS.NOTIFICATIONS, DEFAULT_NOTIFICATIONS);
-  AppState.userWallet = getLocalData(STORAGE_KEYS.WALLET, { coins: 150 });
-  AppState.adminAuditLogs = getLocalData(STORAGE_KEYS.AUDIT_LOGS, AppState.adminAuditLogs);
-
-  // Restore authenticated session (persists across page reloads)
-  const storedUserId = getLocalData(STORAGE_KEYS.CURRENT_USER_ID, 'admin_user');
-  AppState.currentUser = AppState.users.find(u => u.userId === storedUserId) || AppState.users[0] || null;
-
-  // Restore real video blobs from IndexedDB
-  for (const v of AppState.videos) {
-    if (v.hasBlob && v.blobKey) {
-      try {
-        const blob = await DeenTokDB.getBlob(v.blobKey);
-        if (blob) {
-          v.videoUrl = URL.createObjectURL(blob);
-        }
-      } catch (err) {
-        console.warn('Could not restore video blob:', v.id, err);
-      }
-    }
-  }
-
-  // Save back normalized collections
-  setLocalData(STORAGE_KEYS.USERS, AppState.users);
-  setLocalData(STORAGE_KEYS.VIDEOS, AppState.videos);
-  setLocalData(STORAGE_KEYS.COMMENTS, AppState.comments);
-  setLocalData(STORAGE_KEYS.MESSAGES, AppState.messages);
-  setLocalData(STORAGE_KEYS.NOTIFICATIONS, AppState.notifications);
-  setLocalData(STORAGE_KEYS.WALLET, AppState.userWallet);
-  setLocalData(STORAGE_KEYS.AUDIT_LOGS, AppState.adminAuditLogs);
-}
+async function initDataStore() { /* Migrated to backend */ }
 
 function updateHeaderAuthState() {
   const loginBtn = document.getElementById('headerLoginBtn');
@@ -2863,7 +2686,7 @@ function switchAuthTab(tab) {
   }
 }
 
-function handleLoginSubmit(e) {
+async function handleLoginSubmit(e) {
   e.preventDefault();
   const identifier = document.getElementById('loginIdentifier')?.value.trim();
   const password = document.getElementById('loginPassword')?.value;
@@ -2877,50 +2700,42 @@ function handleLoginSubmit(e) {
     return;
   }
 
-  const cleanId = identifier.startsWith('@') ? identifier : `@${identifier}`;
-  const user = AppState.users.find(u =>
-    u.username.toLowerCase() === cleanId.toLowerCase() ||
-    u.username.toLowerCase() === identifier.toLowerCase() ||
-    (u.email && u.email.toLowerCase() === identifier.toLowerCase())
-  );
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier, password })
+    });
 
-  if (!user) {
-    if (errorBox) {
-      errorBox.innerText = `Account "${identifier}" not found. Please verify your credentials or register a new account.`;
-      errorBox.style.display = 'block';
+    const data = await res.json();
+    if (!data.success) {
+      if (errorBox) {
+        errorBox.innerText = data.error || 'Login failed';
+        errorBox.style.display = 'block';
+      }
+      return;
     }
-    return;
-  }
 
-  if (user.status === 'SUSPENDED') {
+    const user = data.user;
+    AppState.currentUser = user;
+    setLocalData(STORAGE_KEYS.CURRENT_USER_ID, user.userId);
+
+    closeAuthModal();
+    updateHeaderAuthState();
+    showToast(`Welcome back, ${user.fullName}! 🌙`);
+
+    if (AppState.currentScreen === 'profile') renderUserDashboard();
+    if (AppState.currentScreen === 'admin') renderAdmin();
+  } catch (err) {
+    console.error(err);
     if (errorBox) {
-      errorBox.innerText = 'This account has been suspended by an administrator.';
-      errorBox.style.display = 'block';
+        errorBox.innerText = 'Server error during login.';
+        errorBox.style.display = 'block';
     }
-    return;
   }
-
-  if (user.passwordHash && user.passwordHash !== password) {
-    if (errorBox) {
-      errorBox.innerText = 'Incorrect password. Please try again.';
-      errorBox.style.display = 'block';
-    }
-    return;
-  }
-
-  AppState.currentUser = user;
-  setLocalData(STORAGE_KEYS.CURRENT_USER_ID, user.userId);
-  addAuditLog('USER_LOGIN', `User ${user.username} (${user.role}) signed in successfully`);
-
-  closeAuthModal();
-  updateHeaderAuthState();
-  showToast(`Welcome back, ${user.fullName}! 🌙`);
-
-  if (AppState.currentScreen === 'profile') renderUserDashboard();
-  if (AppState.currentScreen === 'admin') renderAdmin();
 }
 
-function handleRegisterSubmit(e) {
+async function handleRegisterSubmit(e) {
   e.preventDefault();
   const fullName = document.getElementById('regFullName')?.value.trim();
   const usernameRaw = document.getElementById('regUsername')?.value.trim();
@@ -2955,14 +2770,6 @@ function handleRegisterSubmit(e) {
   }
 
   const cleanUser = usernameRaw.startsWith('@') ? usernameRaw : `@${usernameRaw}`;
-  const exists = AppState.users.some(u => u.username.toLowerCase() === cleanUser.toLowerCase());
-  if (exists) {
-    if (errorBox) {
-      errorBox.innerText = `Username ${cleanUser} is already taken. Please choose another handle.`;
-      errorBox.style.display = 'block';
-    }
-    return;
-  }
 
   const newUser = {
     userId: `user_${Date.now()}`,
@@ -2982,19 +2789,38 @@ function handleRegisterSubmit(e) {
     createdAt: Date.now()
   };
 
-  AppState.users.push(newUser);
-  setLocalData(STORAGE_KEYS.USERS, AppState.users);
+  try {
+    const res = await fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user: newUser })
+    });
+    const data = await res.json();
 
-  AppState.currentUser = newUser;
-  setLocalData(STORAGE_KEYS.CURRENT_USER_ID, newUser.userId);
-  addAuditLog('USER_REGISTERED', `New account ${cleanUser} registered with role ${role}`);
+    if (!data.success) {
+       if (errorBox) {
+          errorBox.innerText = data.error || 'Registration failed';
+          errorBox.style.display = 'block';
+       }
+       return;
+    }
 
-  closeAuthModal();
-  updateHeaderAuthState();
-  showToast(`Account created! Welcome to DeenTok, ${fullName}! 🤲🏽`);
+    AppState.users.push(newUser);
+    AppState.currentUser = newUser;
+    setLocalData(STORAGE_KEYS.CURRENT_USER_ID, newUser.userId);
 
-  if (AppState.currentScreen === 'profile') renderUserDashboard();
-  if (AppState.currentScreen === 'admin') renderAdmin();
+    closeAuthModal();
+    updateHeaderAuthState();
+    showToast(`Account created! Welcome to DeenTok, ${fullName}! 🤲🏽`);
+
+    if (AppState.currentScreen === 'profile') renderUserDashboard();
+    if (AppState.currentScreen === 'admin') renderAdmin();
+  } catch (err) {
+      if (errorBox) {
+          errorBox.innerText = 'Server error during registration.';
+          errorBox.style.display = 'block';
+      }
+  }
 }
 
 function handleLogoutClick() {
