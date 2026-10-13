@@ -16,18 +16,103 @@ const STORAGE_KEYS = {
   USERS: 'deentok_users_v1',
   WALLET: 'deentok_wallet_v1',
   PREFS: 'deentok_preferences_v1',
-  CURRENT_USER: 'deentok_current_user_v1'
+  CURRENT_USER_ID: 'deentok_current_user_id_v2',
+  AUDIT_LOGS: 'deentok_audit_logs_v1'
+};
+
+// ============================================================================
+// IndexedDB Media Storage Engine (Client-Side Persistent Blob Store)
+// ============================================================================
+const DB_NAME = 'deentok_media_v2';
+const DB_VERSION = 1;
+const STORE_NAME = 'video_blobs';
+
+const DeenTokDB = {
+  db: null,
+  async init() {
+    if (this.db) return this.db;
+    return new Promise((resolve) => {
+      if (typeof indexedDB === 'undefined') {
+        resolve(null);
+        return;
+      }
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      request.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME);
+        }
+      };
+      request.onsuccess = (e) => {
+        this.db = e.target.result;
+        resolve(this.db);
+      };
+      request.onerror = (e) => {
+        console.warn('IndexedDB unavailable', e);
+        resolve(null);
+      };
+    });
+  },
+  async saveBlob(id, blob) {
+    const db = await this.init();
+    if (!db) return false;
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction([STORE_NAME], 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        store.put(blob, String(id));
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      } catch (err) {
+        console.error('Failed to save video blob to IndexedDB:', err);
+        resolve(false);
+      }
+    });
+  },
+  async getBlob(id) {
+    const db = await this.init();
+    if (!db) return null;
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction([STORE_NAME], 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.get(String(id));
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => resolve(null);
+      } catch (err) {
+        console.error('Failed to load video blob from IndexedDB:', err);
+        resolve(null);
+      }
+    });
+  },
+  async deleteBlob(id) {
+    const db = await this.init();
+    if (!db) return false;
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction([STORE_NAME], 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        store.delete(String(id));
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      } catch (err) {
+        resolve(false);
+      }
+    });
+  }
 };
 
 const DEFAULT_USERS = [
   {
-    userId: 'current_user',
+    userId: 'admin_user',
     username: '@me',
+    email: 'admin@deentok.org',
+    passwordHash: 'admin123',
     fullName: 'Jemal Jima',
     avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-    role: 'ADMIN', // 'USER', 'CREATOR', 'ADMIN'
+    role: 'ADMIN',
     status: 'ACTIVE',
-    bio: 'Beneficial reminders for the soul. Al-Qur\'an & Sunnah learner. 🌙',
+    bio: 'Platform Administrator. Beneficial reminders for the soul. Al-Qur\'an & Sunnah learner. 🌙',
     followersCount: 1420,
     followingCount: 38,
     likesCount: 5210,
@@ -36,6 +121,8 @@ const DEFAULT_USERS = [
   {
     userId: 'creator_1',
     username: '@quran_reminders',
+    email: 'quran@deentok.org',
+    passwordHash: 'creator123',
     fullName: 'Sheikh Mishary Reminders',
     avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
     role: 'CREATOR',
@@ -49,6 +136,8 @@ const DEFAULT_USERS = [
   {
     userId: 'creator_2',
     username: '@sunnah_gems',
+    email: 'sunnah@deentok.org',
+    passwordHash: 'creator123',
     fullName: 'Sunnah Gems Official',
     avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
     role: 'CREATOR',
@@ -62,6 +151,8 @@ const DEFAULT_USERS = [
   {
     userId: 'creator_3',
     username: '@muslim_reminders',
+    email: 'dua@deentok.org',
+    passwordHash: 'creator123',
     fullName: 'Daily Duas & Supplications',
     avatarUrl: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=200&q=80',
     role: 'CREATOR',
@@ -75,6 +166,8 @@ const DEFAULT_USERS = [
   {
     userId: 'creator_4',
     username: '@deen_history',
+    email: 'history@deentok.org',
+    passwordHash: 'creator123',
     fullName: 'Islamic History & Wisdom',
     avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80',
     role: 'CREATOR',
@@ -331,32 +424,107 @@ const AppState = {
 // 2. Initialization & Bootstrapping
 // ============================================================================
 
-document.addEventListener('DOMContentLoaded', () => {
-  initDataStore();
+document.addEventListener('DOMContentLoaded', async () => {
+  await initDataStore();
   setupEventListeners();
   renderApp();
   renderVideoFeed();
   renderExplorePills();
   renderSuggestedCreators();
   updateHeaderBadges();
+  updateHeaderAuthState();
 });
 
-function initDataStore() {
+async function initDataStore() {
+  await DeenTokDB.init();
   AppState.users = getLocalData(STORAGE_KEYS.USERS, DEFAULT_USERS);
   AppState.videos = getLocalData(STORAGE_KEYS.VIDEOS, DEFAULT_VIDEOS);
   AppState.comments = getLocalData(STORAGE_KEYS.COMMENTS, DEFAULT_COMMENTS);
   AppState.messages = getLocalData(STORAGE_KEYS.MESSAGES, DEFAULT_MESSAGES);
   AppState.notifications = getLocalData(STORAGE_KEYS.NOTIFICATIONS, DEFAULT_NOTIFICATIONS);
   AppState.userWallet = getLocalData(STORAGE_KEYS.WALLET, { coins: 150 });
-  AppState.currentUser = AppState.users.find(u => u.userId === 'current_user') || DEFAULT_USERS[0];
+  AppState.adminAuditLogs = getLocalData(STORAGE_KEYS.AUDIT_LOGS, AppState.adminAuditLogs);
 
-  // Save back defaults if newly initialized
+  // Restore authenticated session (persists across page reloads)
+  const storedUserId = getLocalData(STORAGE_KEYS.CURRENT_USER_ID, 'admin_user');
+  AppState.currentUser = AppState.users.find(u => u.userId === storedUserId) || AppState.users[0] || null;
+
+  // Restore real video blobs from IndexedDB
+  for (const v of AppState.videos) {
+    if (v.hasBlob && v.blobKey) {
+      try {
+        const blob = await DeenTokDB.getBlob(v.blobKey);
+        if (blob) {
+          v.videoUrl = URL.createObjectURL(blob);
+        }
+      } catch (err) {
+        console.warn('Could not restore video blob:', v.id, err);
+      }
+    }
+  }
+
+  // Save back normalized collections
   setLocalData(STORAGE_KEYS.USERS, AppState.users);
   setLocalData(STORAGE_KEYS.VIDEOS, AppState.videos);
   setLocalData(STORAGE_KEYS.COMMENTS, AppState.comments);
   setLocalData(STORAGE_KEYS.MESSAGES, AppState.messages);
   setLocalData(STORAGE_KEYS.NOTIFICATIONS, AppState.notifications);
   setLocalData(STORAGE_KEYS.WALLET, AppState.userWallet);
+  setLocalData(STORAGE_KEYS.AUDIT_LOGS, AppState.adminAuditLogs);
+}
+
+function updateHeaderAuthState() {
+  const loginBtn = document.getElementById('headerLoginBtn');
+  const trigger = document.getElementById('headerUserMenuTrigger');
+  const avatar = document.getElementById('headerUserAvatar');
+  const dropdownAvatar = document.getElementById('dropdownUserAvatar');
+  const dropdownName = document.getElementById('dropdownUserName');
+  const dropdownHandle = document.getElementById('dropdownUserHandle');
+  const dropdownRole = document.getElementById('dropdownUserRole');
+  const adminLink = document.getElementById('dropdownAdminLink');
+
+  if (AppState.currentUser) {
+    if (loginBtn) loginBtn.style.display = 'none';
+    if (trigger) trigger.style.display = 'flex';
+    if (avatar) avatar.src = AppState.currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80';
+    if (dropdownAvatar) dropdownAvatar.src = AppState.currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80';
+    if (dropdownName) dropdownName.innerText = AppState.currentUser.fullName || 'User';
+    if (dropdownHandle) dropdownHandle.innerText = AppState.currentUser.username || '@user';
+    if (dropdownRole) {
+      dropdownRole.innerText = AppState.currentUser.role || 'USER';
+      dropdownRole.className = `user-role-badge ${AppState.currentUser.role === 'ADMIN' ? 'role-badge-admin' : AppState.currentUser.role === 'CREATOR' ? 'role-badge-creator' : 'role-badge-user'}`;
+    }
+    if (adminLink) {
+      adminLink.style.display = AppState.currentUser.role === 'ADMIN' ? 'flex' : 'none';
+    }
+  } else {
+    if (loginBtn) loginBtn.style.display = 'block';
+    if (trigger) trigger.style.display = 'none';
+  }
+}
+
+function requireAuth(actionName = 'perform this action') {
+  if (!AppState.currentUser) {
+    showToast(`Please sign in to ${actionName}.`);
+    openAuthModal('login');
+    return false;
+  }
+  return true;
+}
+
+function addAuditLog(action, details) {
+  const now = new Date();
+  const timeStr = now.toTimeString().split(' ')[0];
+  const adminName = AppState.currentUser?.fullName || 'System';
+  const entry = {
+    timestamp: timeStr,
+    admin: adminName,
+    action: action,
+    details: details
+  };
+  AppState.adminAuditLogs.unshift(entry);
+  if (AppState.adminAuditLogs.length > 60) AppState.adminAuditLogs.pop();
+  setLocalData(STORAGE_KEYS.AUDIT_LOGS, AppState.adminAuditLogs);
 }
 
 // ============================================================================
@@ -621,6 +789,8 @@ function toggleVideoPlayPause() {
 }
 
 function toggleLikeVideo(videoId) {
+  if (!requireAuth('like video reminders')) return;
+
   const video = AppState.videos.find(v => v.id === videoId);
   if (!video) return;
 
@@ -631,18 +801,19 @@ function toggleLikeVideo(videoId) {
   renderVideoFeed();
 
   if (video.isLiked) {
-    // Add activity notification
     addNotification({
       type: 'LIKE',
       title: 'New Like!',
       description: `liked your video: "${video.title}"`,
-      sourceUsername: AppState.currentUser.username
+      sourceUsername: AppState.currentUser?.username || '@user'
     });
     showToast('Added to Liked Videos ❤️');
   }
 }
 
 function toggleFollowVideo(videoId) {
+  if (!requireAuth('follow creators')) return;
+
   const video = AppState.videos.find(v => v.id === videoId);
   if (!video) return;
 
@@ -654,12 +825,25 @@ function toggleFollowVideo(videoId) {
     }
   });
 
+  // Also update creator record
+  const creator = AppState.users.find(u => u.username === video.username || u.userId === video.userId);
+  if (creator) {
+    creator.followersCount = Math.max(0, (creator.followersCount || 0) + (video.isFollowingCreator ? 1 : -1));
+    if (AppState.currentUser) {
+      AppState.currentUser.followingCount = Math.max(0, (AppState.currentUser.followingCount || 0) + (video.isFollowingCreator ? 1 : -1));
+    }
+    setLocalData(STORAGE_KEYS.USERS, AppState.users);
+  }
+
   setLocalData(STORAGE_KEYS.VIDEOS, AppState.videos);
   renderVideoFeed();
+  renderSuggestedCreators();
   showToast(video.isFollowingCreator ? `Following ${video.username}` : `Unfollowed ${video.username}`);
 }
 
 function toggleSaveVideo(videoId) {
+  if (!requireAuth('save videos')) return;
+
   const video = AppState.videos.find(v => v.id === videoId);
   if (!video) return;
   video.isSaved = !video.isSaved;
@@ -750,6 +934,8 @@ function handleCommentKey(e) {
 }
 
 function submitNewComment() {
+  if (!requireAuth('post comments')) return;
+
   const input = document.getElementById('newCommentInput');
   if (!input || !input.value.trim()) return;
 
@@ -757,7 +943,7 @@ function submitNewComment() {
     id: Date.now(),
     videoId: AppState.activeVideoIdForComments,
     username: AppState.currentUser.username,
-    userAvatarUrl: AppState.currentUser.avatarUrl,
+    userAvatarUrl: AppState.currentUser.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80',
     text: input.value.trim(),
     createdAt: Date.now()
   };
@@ -861,8 +1047,11 @@ function executeSearch() {
 }
 
 // ============================================================================
-// 7. Video Upload Studio
+// 7. Video Upload Studio (Real Local Video Blob & URL Storage Engine)
 // ============================================================================
+
+let pendingUploadFile = null;
+let pendingUploadFileUrl = null;
 
 function triggerFileInput() {
   document.getElementById('videoFileInput')?.click();
@@ -870,13 +1059,51 @@ function triggerFileInput() {
 
 function handleFileSelect(e) {
   const file = e.target.files[0];
-  if (file) {
-    document.getElementById('uploadTitle').value = file.name.replace(/\.[^/.]+$/, "");
-    showToast(`Selected file: ${file.name}`);
+  if (!file) return;
+
+  pendingUploadFile = file;
+  if (pendingUploadFileUrl) {
+    URL.revokeObjectURL(pendingUploadFileUrl);
   }
+  pendingUploadFileUrl = URL.createObjectURL(file);
+
+  const titleInput = document.getElementById('uploadTitle');
+  if (titleInput && !titleInput.value) {
+    titleInput.value = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, ' ');
+  }
+
+  const previewBox = document.getElementById('uploadPreviewBox');
+  const previewVideo = document.getElementById('uploadVideoPreview');
+  const fileInfo = document.getElementById('uploadFileInfo');
+
+  if (previewBox && previewVideo) {
+    previewVideo.src = pendingUploadFileUrl;
+    previewBox.style.display = 'block';
+  }
+  if (fileInfo) {
+    const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+    fileInfo.innerText = `${file.name} (${sizeMb} MB) • Ready to publish`;
+  }
+  showToast(`Loaded video file: ${file.name}`);
 }
 
-function publishVideo() {
+function clearSelectedVideo() {
+  pendingUploadFile = null;
+  if (pendingUploadFileUrl) {
+    URL.revokeObjectURL(pendingUploadFileUrl);
+    pendingUploadFileUrl = null;
+  }
+  const previewBox = document.getElementById('uploadPreviewBox');
+  const previewVideo = document.getElementById('uploadVideoPreview');
+  const fileInput = document.getElementById('videoFileInput');
+  if (previewBox) previewBox.style.display = 'none';
+  if (previewVideo) previewVideo.src = '';
+  if (fileInput) fileInput.value = '';
+}
+
+async function publishVideo() {
+  if (!requireAuth('publish videos')) return;
+
   const title = document.getElementById('uploadTitle')?.value.trim();
   const desc = document.getElementById('uploadDescription')?.value.trim() || '';
   const category = document.getElementById('uploadCategory')?.value || 'Quran';
@@ -885,16 +1112,31 @@ function publishVideo() {
   const thumbUrl = document.getElementById('uploadThumbUrl')?.value.trim() || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80';
 
   if (!title) {
-    alert('Please enter a title for your video.');
+    showToast('Please enter a title for your video.');
     return;
   }
 
+  if (!pendingUploadFile && !pendingUploadFileUrl) {
+    showToast('Please select a video file or provide a video link.');
+    return;
+  }
+
+  const newVideoId = Date.now();
+  let videoPlaybackUrl = pendingUploadFileUrl;
+
+  // Persist real Blob in client IndexedDB storage
+  if (pendingUploadFile) {
+    await DeenTokDB.saveBlob(newVideoId, pendingUploadFile);
+  }
+
   const newVideo = {
-    id: Date.now(),
+    id: newVideoId,
     userId: AppState.currentUser.userId,
     username: AppState.currentUser.username,
-    userAvatarUrl: AppState.currentUser.avatarUrl,
-    videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-tree-branches-in-the-breeze-1188-large.mp4',
+    userAvatarUrl: AppState.currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
+    videoUrl: videoPlaybackUrl,
+    hasBlob: !!pendingUploadFile,
+    blobKey: newVideoId,
     thumbnailUrl: thumbUrl,
     title: title,
     description: desc,
@@ -914,10 +1156,13 @@ function publishVideo() {
   AppState.videos.unshift(newVideo);
   setLocalData(STORAGE_KEYS.VIDEOS, AppState.videos);
 
+  addAuditLog('VIDEO_PUBLISHED', `Published video "${title}" (ID: ${newVideoId})`);
+
   // Clear inputs
   document.getElementById('uploadTitle').value = '';
   document.getElementById('uploadDescription').value = '';
   document.getElementById('uploadRef').value = '';
+  clearSelectedVideo();
 
   showToast('Video published successfully! 🚀');
   AppState.currentVideoIndex = 0;
@@ -989,12 +1234,14 @@ function handleChatKey(e) {
 }
 
 function sendDirectMessage() {
+  if (!requireAuth('send direct messages')) return;
+
   const input = document.getElementById('chatMsgInput');
   if (!input || !input.value.trim()) return;
 
   const newMsg = {
     id: Date.now(),
-    senderId: 'current_user',
+    senderId: AppState.currentUser.userId,
     senderName: AppState.currentUser.username,
     receiverId: AppState.activeChatRecipient,
     text: input.value.trim(),
@@ -1084,7 +1331,25 @@ function switchProfileTab(tab) {
 
 function renderUserDashboard() {
   const u = AppState.currentUser;
-  if (!u) return;
+  if (!u) {
+    const container = document.getElementById('userDashboardBody');
+    if (container) {
+      container.innerHTML = `
+        <div class="access-denied-box" style="margin-top:20px;">
+          <div style="font-size:48px; margin-bottom:16px;">👤</div>
+          <h2 style="color:#fff; margin-bottom:8px;">Sign In to View Your Account</h2>
+          <p style="color:#9ca3af; margin-bottom:20px; font-size:14px; line-height:1.5;">
+            Create an account or sign in to manage your uploaded video reminders, bookmarks, likes, and profile settings.
+          </p>
+          <div style="display:flex; justify-content:center; gap:12px;">
+            <button class="btn-primary" onclick="openAuthModal('login')">Sign In</button>
+            <button class="btn-outline-sm" style="padding:10px 20px;" onclick="openAuthModal('register')">Create Account</button>
+          </div>
+        </div>
+      `;
+    }
+    return;
+  }
 
   // 1. Update Profile Hero Elements
   const avatarElem = document.getElementById('profileAvatar');
@@ -1595,20 +1860,23 @@ function saveVideoChanges() {
   showToast('Video details updated! ✨');
 }
 
-function deleteUserVideo(videoId) {
+async function deleteUserVideo(videoId) {
   if (!confirm('Are you sure you want to delete this video reminder?')) return;
   AppState.videos = AppState.videos.filter(v => v.id !== videoId);
+  await DeenTokDB.deleteBlob(videoId);
   setLocalData(STORAGE_KEYS.VIDEOS, AppState.videos);
+  addAuditLog('VIDEO_DELETED', `User removed video ID: ${videoId}`);
   renderUserDashboard();
   renderVideoFeed();
   showToast('Video deleted successfully.');
 }
 
 function openEditProfileModal() {
+  if (!requireAuth('edit profile settings')) return;
   const modal = document.getElementById('editProfileModal');
-  document.getElementById('editDisplayName').value = AppState.currentUser.fullName;
-  document.getElementById('editBio').value = AppState.currentUser.bio;
-  document.getElementById('editAvatarUrl').value = AppState.currentUser.avatarUrl;
+  document.getElementById('editDisplayName').value = AppState.currentUser.fullName || '';
+  document.getElementById('editBio').value = AppState.currentUser.bio || '';
+  document.getElementById('editAvatarUrl').value = AppState.currentUser.avatarUrl || '';
   if (modal) modal.classList.add('active');
 }
 
@@ -1617,6 +1885,7 @@ function closeEditProfileModal() {
 }
 
 function saveProfileChanges() {
+  if (!AppState.currentUser) return;
   const name = document.getElementById('editDisplayName').value.trim();
   const bio = document.getElementById('editBio').value.trim();
   const avatar = document.getElementById('editAvatarUrl').value.trim();
@@ -1625,8 +1894,15 @@ function saveProfileChanges() {
   if (bio) AppState.currentUser.bio = bio;
   if (avatar) AppState.currentUser.avatarUrl = avatar;
 
+  // Sync to AppState.users
+  const userIdx = AppState.users.findIndex(u => u.userId === AppState.currentUser.userId);
+  if (userIdx >= 0) {
+    AppState.users[userIdx] = { ...AppState.currentUser };
+  }
+
   setLocalData(STORAGE_KEYS.USERS, AppState.users);
   closeEditProfileModal();
+  updateHeaderAuthState();
   renderUserDashboard();
   showToast('Profile updated! ✨');
 }
@@ -1756,12 +2032,37 @@ function switchAdminTab(tab) {
 }
 
 function renderAdmin() {
+  if (!AppState.currentUser || AppState.currentUser.role !== 'ADMIN') {
+    const stageTitle = document.getElementById('adminStageTitle');
+    if (stageTitle) stageTitle.innerText = 'Administrator Portal - Access Restricted';
+    const stageSub = document.getElementById('adminStageSubtitle');
+    if (stageSub) stageSub.innerText = 'Role-based access security enforcement';
+    const body = document.getElementById('adminStageBody');
+    if (body) {
+      body.innerHTML = `
+        <div class="access-denied-box">
+          <div style="font-size:48px; margin-bottom:16px;">🛡️</div>
+          <h2 style="color:#fff; margin-bottom:8px;">Administrator Access Required</h2>
+          <p style="color:#9ca3af; margin-bottom:20px; font-size:14px; line-height:1.6;">
+            The Admin Console is restricted to authorized platform administrators.<br>
+            ${AppState.currentUser ? `Current account is <strong>${AppState.currentUser.username}</strong> with role <span class="user-role-badge role-badge-user">${AppState.currentUser.role}</span>.` : 'You are currently not signed in.'}
+          </p>
+          <div style="display:flex; justify-content:center; gap:12px;">
+            <button class="btn-primary" onclick="openAuthModal('login')">Sign In as Admin</button>
+            <button class="btn-cancel" onclick="navigateTo('home')">Return to Home</button>
+          </div>
+        </div>
+      `;
+    }
+    return;
+  }
+
   // Update Admin Profile Header Info
   const adminNameElem = document.getElementById('adminHeaderName');
   if (adminNameElem) adminNameElem.innerText = AppState.currentUser.fullName || 'Admin';
 
   const adminAvatarElem = document.getElementById('adminHeaderAvatar');
-  if (adminAvatarElem) adminAvatarElem.src = AppState.currentUser.avatarUrl;
+  if (adminAvatarElem) adminAvatarElem.src = AppState.currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80';
 
   const adminRolePill = document.getElementById('adminRolePill');
   if (adminRolePill) adminRolePill.innerText = AppState.currentUser.role === 'ADMIN' ? 'Super Admin' : AppState.currentUser.role;
@@ -2314,18 +2615,12 @@ function promoteUserRole(userId) {
   showToast(`${u.username} role changed to: ${u.role}`);
 }
 
-function deleteVideoAdmin(videoId) {
+async function deleteVideoAdmin(videoId) {
   if (!confirm('Are you sure you want to remove this video by moderation?')) return;
   AppState.videos = AppState.videos.filter(v => v.id !== videoId);
+  await DeenTokDB.deleteBlob(videoId);
   setLocalData(STORAGE_KEYS.VIDEOS, AppState.videos);
-  
-  AppState.adminAuditLogs.unshift({
-    timestamp: new Date().toLocaleTimeString(),
-    admin: AppState.currentUser.fullName || 'Admin',
-    action: 'Video Deleted',
-    details: `Video ID ${videoId} removed`
-  });
-
+  addAuditLog('VIDEO_MODERATED', `Administrator removed video ID ${videoId}`);
   renderAdmin();
   showToast('Video removed by moderation.');
 }
@@ -2422,11 +2717,299 @@ function renderSuggestedCreators() {
 }
 
 function viewCreatorProfile(userId) {
-  const u = AppState.users.find(user => user.userId === userId);
-  if (u) {
-    AppState.currentUser = u;
-    navigateTo('profile');
+  const creator = AppState.users.find(u => u.userId === userId || u.username === userId);
+  if (!creator) return;
+
+  const creatorVideos = AppState.videos.filter(v => v.userId === creator.userId || v.username === creator.username);
+  const isFollowing = AppState.currentUser ? (creator.followersList || []).includes(AppState.currentUser.userId) : false;
+
+  const modal = document.getElementById('creatorProfileModal');
+  const body = document.getElementById('creatorProfileBody');
+  const title = document.getElementById('creatorModalTitle');
+  if (title) title.innerText = creator.fullName;
+
+  if (body) {
+    body.innerHTML = `
+      <div style="display:flex; align-items:center; gap:16px; margin-bottom:16px;">
+        <img src="${creator.avatarUrl}" class="avatar-lg" style="width:68px; height:68px; border-radius:50%; border:2px solid #10b981; object-fit:cover;" alt="${creator.username}">
+        <div>
+          <h3 style="margin:0; font-size:18px; color:#fff;">${creator.fullName}</h3>
+          <p style="margin:3px 0; color:#9ca3af; font-size:13px;">${creator.username}</p>
+          <span class="user-role-badge ${creator.role === 'ADMIN' ? 'role-badge-admin' : creator.role === 'CREATOR' ? 'role-badge-creator' : 'role-badge-user'}">${creator.role}</span>
+        </div>
+      </div>
+      <p style="color:#d1d5db; font-size:13px; line-height:1.5; margin-bottom:16px;">${creator.bio || 'Beneficial reminders for the soul.'}</p>
+      <div style="display:flex; justify-content:space-around; background:rgba(255,255,255,0.04); padding:12px; border-radius:10px; margin-bottom:16px;">
+        <div style="text-align:center;"><strong style="color:#fff; font-size:15px;">${formatMetric(creator.followersCount || 0)}</strong><div style="font-size:11px; color:#9ca3af;">Followers</div></div>
+        <div style="text-align:center;"><strong style="color:#fff; font-size:15px;">${formatMetric(creator.followingCount || 0)}</strong><div style="font-size:11px; color:#9ca3af;">Following</div></div>
+        <div style="text-align:center;"><strong style="color:#fff; font-size:15px;">${formatMetric(creator.likesCount || 0)}</strong><div style="font-size:11px; color:#9ca3af;">Likes</div></div>
+      </div>
+      <div style="margin-bottom:20px;">
+        <button class="${isFollowing ? 'btn-outline-sm' : 'btn-primary-sm'}" style="width:100%; padding:10px; font-weight:700;" onclick="toggleFollowCreator('${creator.userId}')">
+          ${isFollowing ? '✓ Following' : '+ Follow Creator'}
+        </button>
+      </div>
+      <h4 style="color:#fff; margin-bottom:12px; font-size:14px;">Videos by ${creator.fullName} (${creatorVideos.length})</h4>
+      <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:10px;">
+        ${creatorVideos.map(v => `
+          <div class="video-grid-item" onclick="playSpecificVideo(${v.id}); closeCreatorProfileModal();" style="cursor:pointer; position:relative; aspect-ratio:9/16; border-radius:8px; overflow:hidden; background:#000;">
+            <img src="${v.thumbnailUrl}" style="width:100%; height:100%; object-fit:cover;">
+            <div style="position:absolute; bottom:6px; left:6px; right:6px; font-size:11px; color:#fff; font-weight:600; text-shadow:0 1px 3px rgba(0,0,0,0.8); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${v.title}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
   }
+  if (modal) modal.classList.add('active');
+}
+
+function closeCreatorProfileModal() {
+  document.getElementById('creatorProfileModal')?.classList.remove('active');
+}
+
+function playSpecificVideo(videoId) {
+  const idx = AppState.videos.findIndex(v => v.id === videoId);
+  if (idx >= 0) {
+    AppState.currentVideoIndex = idx;
+    navigateTo('home');
+  }
+}
+
+function toggleFollowCreator(userId) {
+  if (!requireAuth('follow creators')) return;
+  const creator = AppState.users.find(u => u.userId === userId || u.username === userId);
+  if (!creator) return;
+
+  if (!creator.followersList) creator.followersList = [];
+  const currId = AppState.currentUser.userId;
+  const idx = creator.followersList.indexOf(currId);
+
+  if (idx >= 0) {
+    creator.followersList.splice(idx, 1);
+    creator.followersCount = Math.max(0, (creator.followersCount || 1) - 1);
+    AppState.currentUser.followingCount = Math.max(0, (AppState.currentUser.followingCount || 1) - 1);
+    showToast(`Unfollowed ${creator.username}`);
+  } else {
+    creator.followersList.push(currId);
+    creator.followersCount = (creator.followersCount || 0) + 1;
+    AppState.currentUser.followingCount = (AppState.currentUser.followingCount || 0) + 1;
+    showToast(`Following ${creator.username}! 🌙`);
+  }
+
+  // Sync to video feed follow badges
+  AppState.videos.forEach(v => {
+    if (v.userId === creator.userId || v.username === creator.username) {
+      v.isFollowingCreator = idx < 0;
+    }
+  });
+
+  setLocalData(STORAGE_KEYS.USERS, AppState.users);
+  setLocalData(STORAGE_KEYS.VIDEOS, AppState.videos);
+  renderVideoFeed();
+  renderSuggestedCreators();
+  viewCreatorProfile(userId);
+}
+
+// User Menu & Auth Controls
+function toggleUserDropdown() {
+  const menu = document.getElementById('userDropdownMenu');
+  if (menu) {
+    menu.style.display = menu.style.display === 'none' ? 'flex' : 'none';
+  }
+}
+
+function closeUserDropdown() {
+  const menu = document.getElementById('userDropdownMenu');
+  if (menu) menu.style.display = 'none';
+}
+
+function openAuthModal(tab = 'login') {
+  closeUserDropdown();
+  const modal = document.getElementById('authModal');
+  if (modal) {
+    modal.classList.add('active');
+    switchAuthTab(tab);
+  }
+}
+
+function closeAuthModal() {
+  const modal = document.getElementById('authModal');
+  if (modal) modal.classList.remove('active');
+  const logErr = document.getElementById('loginErrorMsg');
+  const regErr = document.getElementById('registerErrorMsg');
+  if (logErr) logErr.style.display = 'none';
+  if (regErr) regErr.style.display = 'none';
+}
+
+function switchAuthTab(tab) {
+  const loginForm = document.getElementById('loginForm');
+  const registerForm = document.getElementById('registerForm');
+  const tabLogin = document.getElementById('authTabLogin');
+  const tabRegister = document.getElementById('authTabRegister');
+  const title = document.getElementById('authModalTitle');
+
+  if (tab === 'login') {
+    if (loginForm) loginForm.style.display = 'block';
+    if (registerForm) registerForm.style.display = 'none';
+    if (tabLogin) tabLogin.classList.add('active');
+    if (tabRegister) tabRegister.classList.remove('active');
+    if (title) title.innerText = 'Sign In to DeenTok';
+  } else {
+    if (loginForm) loginForm.style.display = 'none';
+    if (registerForm) registerForm.style.display = 'block';
+    if (tabLogin) tabLogin.classList.remove('active');
+    if (tabRegister) tabRegister.classList.add('active');
+    if (title) title.innerText = 'Create DeenTok Account';
+  }
+}
+
+function handleLoginSubmit(e) {
+  e.preventDefault();
+  const identifier = document.getElementById('loginIdentifier')?.value.trim();
+  const password = document.getElementById('loginPassword')?.value;
+  const errorBox = document.getElementById('loginErrorMsg');
+
+  if (!identifier || !password) {
+    if (errorBox) {
+      errorBox.innerText = 'Please provide both username/email and password.';
+      errorBox.style.display = 'block';
+    }
+    return;
+  }
+
+  const cleanId = identifier.startsWith('@') ? identifier : `@${identifier}`;
+  const user = AppState.users.find(u =>
+    u.username.toLowerCase() === cleanId.toLowerCase() ||
+    u.username.toLowerCase() === identifier.toLowerCase() ||
+    (u.email && u.email.toLowerCase() === identifier.toLowerCase())
+  );
+
+  if (!user) {
+    if (errorBox) {
+      errorBox.innerText = `Account "${identifier}" not found. Please verify your credentials or register a new account.`;
+      errorBox.style.display = 'block';
+    }
+    return;
+  }
+
+  if (user.status === 'SUSPENDED') {
+    if (errorBox) {
+      errorBox.innerText = 'This account has been suspended by an administrator.';
+      errorBox.style.display = 'block';
+    }
+    return;
+  }
+
+  if (user.passwordHash && user.passwordHash !== password) {
+    if (errorBox) {
+      errorBox.innerText = 'Incorrect password. Please try again.';
+      errorBox.style.display = 'block';
+    }
+    return;
+  }
+
+  AppState.currentUser = user;
+  setLocalData(STORAGE_KEYS.CURRENT_USER_ID, user.userId);
+  addAuditLog('USER_LOGIN', `User ${user.username} (${user.role}) signed in successfully`);
+
+  closeAuthModal();
+  updateHeaderAuthState();
+  showToast(`Welcome back, ${user.fullName}! 🌙`);
+
+  if (AppState.currentScreen === 'profile') renderUserDashboard();
+  if (AppState.currentScreen === 'admin') renderAdmin();
+}
+
+function handleRegisterSubmit(e) {
+  e.preventDefault();
+  const fullName = document.getElementById('regFullName')?.value.trim();
+  const usernameRaw = document.getElementById('regUsername')?.value.trim();
+  const identifier = document.getElementById('regIdentifier')?.value.trim();
+  const password = document.getElementById('regPassword')?.value;
+  const confirmPassword = document.getElementById('regConfirmPassword')?.value;
+  const role = document.getElementById('regRole')?.value || 'USER';
+  const errorBox = document.getElementById('registerErrorMsg');
+
+  if (!fullName || !usernameRaw || !identifier || !password) {
+    if (errorBox) {
+      errorBox.innerText = 'Please fill out all required fields.';
+      errorBox.style.display = 'block';
+    }
+    return;
+  }
+
+  if (password.length < 6) {
+    if (errorBox) {
+      errorBox.innerText = 'Password must be at least 6 characters.';
+      errorBox.style.display = 'block';
+    }
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    if (errorBox) {
+      errorBox.innerText = 'Passwords do not match.';
+      errorBox.style.display = 'block';
+    }
+    return;
+  }
+
+  const cleanUser = usernameRaw.startsWith('@') ? usernameRaw : `@${usernameRaw}`;
+  const exists = AppState.users.some(u => u.username.toLowerCase() === cleanUser.toLowerCase());
+  if (exists) {
+    if (errorBox) {
+      errorBox.innerText = `Username ${cleanUser} is already taken. Please choose another handle.`;
+      errorBox.style.display = 'block';
+    }
+    return;
+  }
+
+  const newUser = {
+    userId: `user_${Date.now()}`,
+    username: cleanUser,
+    email: identifier.includes('@') ? identifier : '',
+    phone: identifier.includes('@') ? '' : identifier,
+    passwordHash: password,
+    fullName: fullName,
+    avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
+    role: role,
+    status: 'ACTIVE',
+    bio: 'Beneficial reminders for the soul. Al-Qur\'an & Sunnah learner. 🌙',
+    followersCount: 0,
+    followingCount: 0,
+    likesCount: 0,
+    isVerified: role === 'CREATOR' || role === 'ADMIN',
+    createdAt: Date.now()
+  };
+
+  AppState.users.push(newUser);
+  setLocalData(STORAGE_KEYS.USERS, AppState.users);
+
+  AppState.currentUser = newUser;
+  setLocalData(STORAGE_KEYS.CURRENT_USER_ID, newUser.userId);
+  addAuditLog('USER_REGISTERED', `New account ${cleanUser} registered with role ${role}`);
+
+  closeAuthModal();
+  updateHeaderAuthState();
+  showToast(`Account created! Welcome to DeenTok, ${fullName}! 🤲🏽`);
+
+  if (AppState.currentScreen === 'profile') renderUserDashboard();
+  if (AppState.currentScreen === 'admin') renderAdmin();
+}
+
+function handleLogoutClick() {
+  const userHandle = AppState.currentUser?.username || 'user';
+  AppState.currentUser = null;
+  setLocalData(STORAGE_KEYS.CURRENT_USER_ID, null);
+  addAuditLog('USER_LOGOUT', `User ${userHandle} signed out`);
+  updateHeaderAuthState();
+  showToast('You have signed out.');
+  navigateTo('home');
+}
+
+function requestWithdrawal() {
+  if (!requireAuth('request coin withdrawals')) return;
+  showToast('Withdrawal request submitted! Minimum threshold $50.00 USD.');
 }
 
 function setupEventListeners() {
@@ -2469,6 +3052,17 @@ function setupEventListeners() {
       }
     }
   }, { passive: true });
+
+  // Close user dropdown on clicking outside
+  window.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('userDropdownMenu');
+    const trigger = document.getElementById('headerUserMenuTrigger');
+    if (dropdown && dropdown.style.display !== 'none') {
+      if (!dropdown.contains(e.target) && !trigger?.contains(e.target)) {
+        dropdown.style.display = 'none';
+      }
+    }
+  });
 }
 
 function closeModalOnOverlay(e, modalId) {

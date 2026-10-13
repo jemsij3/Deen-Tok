@@ -62,11 +62,46 @@
         <span class="badge-dot" id="headerNotifBadge"></span>
       </button>
 
-      <div class="user-menu-trigger" onclick="toggleUserDropdown()">
-        <img id="headerUserAvatar" class="avatar-sm" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" alt="Profile">
+      <div class="auth-header-controls" id="authHeaderControls">
+        <button class="btn-primary-sm" id="headerLoginBtn" onclick="openAuthModal('login')" style="display:none; padding:7px 16px; font-weight:700;">Sign In</button>
+        <div class="user-menu-trigger" id="headerUserMenuTrigger" onclick="toggleUserDropdown()" style="display:none;">
+          <img id="headerUserAvatar" class="avatar-sm" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" alt="Profile">
+        </div>
       </div>
     </div>
   </header>
+
+  <!-- User Profile Dropdown Menu -->
+  <div class="user-dropdown-menu" id="userDropdownMenu" style="display:none;">
+    <div class="user-dropdown-profile">
+      <img id="dropdownUserAvatar" class="avatar-sm" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" alt="Avatar">
+      <div class="dropdown-user-info">
+        <div class="dropdown-user-name" id="dropdownUserName">Jemal Jima</div>
+        <div class="dropdown-user-handle" id="dropdownUserHandle">@me</div>
+        <span class="user-role-badge role-badge-admin" id="dropdownUserRole">ADMIN</span>
+      </div>
+    </div>
+    <div class="dropdown-divider"></div>
+    <a class="dropdown-item" onclick="navigateTo('profile'); closeUserDropdown();">
+      <span>👤 My Profile & Videos</span>
+    </a>
+    <a class="dropdown-item" id="dropdownAdminLink" onclick="navigateTo('admin'); closeUserDropdown();" style="display:none;">
+      <span>🛡️ Admin Portal</span>
+    </a>
+    <a class="dropdown-item" onclick="navigateTo('studio'); closeUserDropdown();">
+      <span>🎬 Creator Studio</span>
+    </a>
+    <a class="dropdown-item" onclick="openWalletModal(); closeUserDropdown();">
+      <span>🪙 Deen Coins & Wallet</span>
+    </a>
+    <a class="dropdown-item" onclick="openEditProfileModal(); closeUserDropdown();">
+      <span>✏️ Edit Profile</span>
+    </a>
+    <div class="dropdown-divider"></div>
+    <a class="dropdown-item logout" onclick="handleLogoutClick(); closeUserDropdown();">
+      <span>🚪 Sign Out</span>
+    </a>
+  </div>
 
   <!-- Main Application Wrapper -->
   <div class="app-layout">
@@ -240,8 +275,17 @@
                 </svg>
                 <p class="drop-title">Select video to upload</p>
                 <p class="drop-sub">Or drag and drop a file (MP4, WebM)</p>
-                <p class="drop-specs">720x1280 resolution or higher • Up to 60 seconds</p>
-                <input type="file" id="videoFileInput" accept="video/*,image/*" style="display:none;" onchange="handleFileSelect(event)">
+                <p class="drop-specs">Standard MP4/WebM supported • Saved locally to IndexedDB</p>
+                <input type="file" id="videoFileInput" accept="video/mp4,video/webm,video/ogg,video/quicktime" style="display:none;" onchange="handleFileSelect(event)">
+              </div>
+
+              <!-- Live Video File Preview -->
+              <div class="upload-preview-container" id="uploadPreviewBox" style="display:none; margin-bottom: 20px; text-align:center;">
+                <video id="uploadVideoPreview" controls playsinline style="max-width:100%; max-height:280px; border-radius:12px; background:#000; box-shadow: 0 10px 25px rgba(0,0,0,0.5);"></video>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:13px; color:#10b981; padding: 0 4px;">
+                  <span id="uploadFileInfo">Selected video ready</span>
+                  <button type="button" class="ud-btn-action" onclick="clearSelectedVideo()" style="color:#ef4444; border-color:rgba(239,68,68,0.3);">Remove file</button>
+                </div>
               </div>
 
               <div class="upload-form">
@@ -773,6 +817,90 @@
       <div class="modal-actions">
         <button class="btn-cancel" onclick="closeEditProfileModal()">Cancel</button>
         <button class="btn-primary" onclick="saveProfileChanges()">Save</button>
+      </div>
+    </div>
+  <!-- Real Authentication Dialog Modal (Sign In / Sign Up) -->
+  <div class="modal-overlay" id="authModal" onclick="closeModalOnOverlay(event, 'authModal')">
+    <div class="auth-dialog">
+      <div class="modal-header">
+        <h3 id="authModalTitle">Sign In to DeenTok</h3>
+        <button class="close-btn" onclick="closeAuthModal()">✕</button>
+      </div>
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab active" id="authTabLogin" onclick="switchAuthTab('login')">Sign In</button>
+        <button type="button" class="auth-tab" id="authTabRegister" onclick="switchAuthTab('register')">Create Account</button>
+      </div>
+
+      <!-- Sign In Form -->
+      <form id="loginForm" onsubmit="handleLoginSubmit(event)" class="auth-form">
+        <div id="loginErrorMsg" class="auth-error-alert" style="display:none;"></div>
+        <div class="form-group">
+          <label>Username or Email *</label>
+          <input type="text" id="loginIdentifier" placeholder="e.g. admin or @me or user@email.com" required autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label>Password *</label>
+          <input type="password" id="loginPassword" placeholder="Enter your password" required autocomplete="current-password">
+        </div>
+        <div style="font-size:12px; color:#9ca3af; margin-bottom:14px; line-height:1.5;">
+          💡 <em>Admin access credentials: <strong>admin</strong> (password: <strong>admin123</strong>) or register your personal account.</em>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-cancel" onclick="closeAuthModal()">Cancel</button>
+          <button type="submit" class="btn-primary" id="loginSubmitBtn">Sign In</button>
+        </div>
+      </form>
+
+      <!-- Registration Form -->
+      <form id="registerForm" onsubmit="handleRegisterSubmit(event)" class="auth-form" style="display:none;">
+        <div id="registerErrorMsg" class="auth-error-alert" style="display:none;"></div>
+        <div class="form-group">
+          <label>Full Name *</label>
+          <input type="text" id="regFullName" placeholder="e.g. Bilal Ibn Rabah" required>
+        </div>
+        <div class="form-group">
+          <label>Username Handle *</label>
+          <input type="text" id="regUsername" placeholder="e.g. @bilal_reminders" required autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label>Email or Phone *</label>
+          <input type="text" id="regIdentifier" placeholder="e.g. bilal@deentok.org or +1234567890" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group half">
+            <label>Password (Min 6 chars) *</label>
+            <input type="password" id="regPassword" placeholder="Min 6 characters" required autocomplete="new-password">
+          </div>
+          <div class="form-group half">
+            <label>Confirm Password *</label>
+            <input type="password" id="regConfirmPassword" placeholder="Repeat password" required autocomplete="new-password">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Account Role Tier</label>
+          <select id="regRole">
+            <option value="USER">Community Member</option>
+            <option value="CREATOR">Content Creator (Videos & Lessons)</option>
+            <option value="ADMIN">System Administrator</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-cancel" onclick="closeAuthModal()">Cancel</button>
+          <button type="submit" class="btn-primary" id="registerSubmitBtn">Register Account</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Creator Profile Modal -->
+  <div class="modal-overlay" id="creatorProfileModal" onclick="closeModalOnOverlay(event, 'creatorProfileModal')">
+    <div class="creator-dialog">
+      <div class="modal-header">
+        <h3 id="creatorModalTitle">Creator Profile</h3>
+        <button class="close-btn" onclick="closeCreatorProfileModal()">✕</button>
+      </div>
+      <div id="creatorProfileBody" class="creator-profile-body">
+        <!-- Rendered via JS -->
       </div>
     </div>
   </div>
