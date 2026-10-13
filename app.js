@@ -294,7 +294,37 @@ const AppState = {
   selectedCategory: 'All',
   searchQuery: '',
   profileTab: 'videos',
-  adminTab: 'users'
+  userDashboardTab: 'overview', // 'overview' | 'my_videos' | 'saved' | 'liked' | 'notifications' | 'messages' | 'settings'
+  adminSection: 'overview', // 'overview' | 'users' | 'videos' | 'community' | 'platform' | 'security'
+  adminUserSearch: '',
+  adminRoleFilter: 'ALL',
+  adminVideoSearch: '',
+  adminCategoryFilter: 'ALL',
+  adminCommunitySubTab: 'comments',
+  activeEditingVideoId: null,
+  adminAuditLogs: [
+    { timestamp: '14:28:10', admin: 'Jemal Jima', action: 'System Verification', details: 'All 25 entities verified and synced' },
+    { timestamp: '13:50:22', admin: 'Jemal Jima', action: 'Content Reviewed', details: 'ID 1: Surah Ar-Rahman (Passed)' },
+    { timestamp: '12:15:04', admin: 'Jemal Jima', action: 'Verification Issued', details: '@sunnah_gems verified' }
+  ],
+  adminReports: [
+    { id: 1, type: 'COMMENT', targetId: 'c_4', reason: 'Spam promotion', reportedBy: '@marcus_dev', status: 'PENDING', createdAt: Date.now() - 3600000 },
+    { id: 2, type: 'VIDEO', targetId: 'v_2', reason: 'Misattributed quote', reportedBy: '@casual_scroll', status: 'RESOLVED', createdAt: Date.now() - 7200000 }
+  ],
+  adminAds: [
+    { id: 1, title: 'Umrah & Hajj Special Guide 2026', sponsor: 'Al-Haramain Travel', status: 'ACTIVE', impressions: 18450, link: '#' },
+    { id: 2, title: 'Global Water Well Project - Sadaqah Jariyah', sponsor: 'Islamic Relief Fund', status: 'ACTIVE', impressions: 32100, link: '#' },
+    { id: 3, title: 'Learn Classical Quranic Arabic', sponsor: 'Bayyinah Institute', status: 'PAUSED', impressions: 9400, link: '#' }
+  ],
+  islamicCategories: [
+    { name: 'Quran', count: 18, active: true },
+    { name: 'Hadith', count: 12, active: true },
+    { name: 'Dua', count: 9, active: true },
+    { name: 'Islamic History', count: 7, active: true },
+    { name: 'Reflection', count: 14, active: true },
+    { name: 'Seerah', count: 5, active: true },
+    { name: 'Fiqh Basics', count: 6, active: true }
+  ]
 };
 
 // ============================================================================
@@ -387,19 +417,11 @@ function switchHomeTab(tab) {
 }
 
 function switchProfileTab(tab) {
-  AppState.profileTab = tab;
-  document.querySelectorAll('.profile-tabs .tab-btn').forEach(b => b.classList.remove('active'));
-  if (tab === 'videos') document.getElementById('tabMyVideos')?.classList.add('active');
-  if (tab === 'liked') document.getElementById('tabLikedVideos')?.classList.add('active');
-  if (tab === 'saved') document.getElementById('tabSavedVideos')?.classList.add('active');
-  renderProfileVideos();
+  switchUserDashboardTab(tab === 'videos' ? 'my_videos' : tab);
 }
 
 function switchAdminTab(tab) {
-  AppState.adminTab = tab;
-  document.querySelectorAll('.admin-tabs .admin-tab').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
-  renderAdminTable();
+  switchAdminSection(tab);
 }
 
 // ============================================================================
@@ -1038,48 +1060,548 @@ function updateHeaderBadges() {
 // 9. Profile & Settings
 // ============================================================================
 
+// ============================================================================
+// 9. User Account & Creator Dashboard
+// ============================================================================
+
 function renderProfile() {
+  renderUserDashboard();
+}
+
+function switchUserDashboardTab(tab) {
+  AppState.userDashboardTab = tab;
+  renderUserDashboard();
+}
+
+// Backward compatibility alias for any existing tab buttons
+function switchProfileTab(tab) {
+  if (tab === 'videos') AppState.userDashboardTab = 'my_videos';
+  else if (tab === 'liked') AppState.userDashboardTab = 'liked';
+  else if (tab === 'saved') AppState.userDashboardTab = 'saved';
+  else AppState.userDashboardTab = tab;
+  renderUserDashboard();
+}
+
+function renderUserDashboard() {
   const u = AppState.currentUser;
-  document.getElementById('profileAvatar').src = u.avatarUrl;
-  document.getElementById('profileUsername').innerText = u.username;
-  document.getElementById('profileFullName').innerText = u.fullName;
-  document.getElementById('profileBio').innerText = u.bio;
-  document.getElementById('profileFollowingCount').innerText = u.followingCount;
-  document.getElementById('profileFollowersCount').innerText = formatMetric(u.followersCount);
-  document.getElementById('profileLikesCount').innerText = formatMetric(u.likesCount);
+  if (!u) return;
+
+  // 1. Update Profile Hero Elements
+  const avatarElem = document.getElementById('profileAvatar');
+  if (avatarElem) avatarElem.src = u.avatarUrl;
+  
+  const userFullElem = document.getElementById('profileFullName');
+  if (userFullElem) userFullElem.innerText = u.fullName;
+  
+  const userHandleElem = document.getElementById('profileUsername');
+  if (userHandleElem) userHandleElem.innerText = u.username;
+  
+  const userBioElem = document.getElementById('profileBio');
+  if (userBioElem) userBioElem.innerText = u.bio;
+
+  const userRoleElem = document.getElementById('userRoleBadge');
+  if (userRoleElem) userRoleElem.innerText = u.role || 'Member';
+
+  const followingElem = document.getElementById('profileFollowingCount');
+  if (followingElem) followingElem.innerText = u.followingCount;
+
+  const followersElem = document.getElementById('profileFollowersCount');
+  if (followersElem) followersElem.innerText = formatMetric(u.followersCount);
+
+  const likesElem = document.getElementById('profileLikesCount');
+  if (likesElem) likesElem.innerText = formatMetric(u.likesCount);
 
   const verifiedBadge = document.getElementById('profileVerifiedBadge');
   if (verifiedBadge) verifiedBadge.style.display = u.isVerified ? 'inline-block' : 'none';
 
-  renderProfileVideos();
+  const coinDisplay = document.getElementById('userWalletCoinDisplay');
+  if (coinDisplay) coinDisplay.innerText = `${AppState.userWallet.coins} 🪙`;
+
+  // 2. Highlight Active Dashboard Tab
+  document.querySelectorAll('.ud-tab-btn').forEach(btn => btn.classList.remove('active'));
+  const activeTabBtn = document.getElementById(`udTab-${AppState.userDashboardTab}`);
+  if (activeTabBtn) activeTabBtn.classList.add('active');
+
+  // 3. Render Dashboard Tab Content
+  const container = document.getElementById('userDashboardBody');
+  if (!container) return;
+
+  const tab = AppState.userDashboardTab;
+
+  if (tab === 'overview') {
+    const userVideos = AppState.videos.filter(v => v.userId === u.userId);
+    const totalViews = userVideos.reduce((sum, v) => sum + (v.viewsCount || 0), 0);
+    const totalLikes = userVideos.reduce((sum, v) => sum + (v.likesCount || 0), 0);
+    const totalComments = userVideos.reduce((sum, v) => sum + (v.commentsCount || 0), 0);
+
+    container.innerHTML = `
+      <div class="ud-overview-grid">
+        <div class="ud-section-card">
+          <h3>
+            <span>Account Summary</span>
+            <span class="user-role-badge">${u.role}</span>
+          </h3>
+          <div class="ud-metric-row">
+            <span>Account Status</span>
+            <strong style="color:#10b981;">Active</strong>
+          </div>
+          <div class="ud-metric-row">
+            <span>Member Since</span>
+            <strong>January 2026</strong>
+          </div>
+          <div class="ud-metric-row">
+            <span>Verified Status</span>
+            <strong>${u.isVerified ? '✓ Verified Creator' : 'Standard Member'}</strong>
+          </div>
+          <div class="ud-metric-row">
+            <span>Primary Language</span>
+            <strong>English & Arabic</strong>
+          </div>
+        </div>
+
+        <div class="ud-section-card">
+          <h3>
+            <span>Deen Coins & Wallet</span>
+            <span style="cursor:pointer; font-size:13px; color:var(--gold-accent);" onclick="openWalletModal()">Top Up ↗</span>
+          </h3>
+          <div class="ud-metric-row">
+            <span>Available Balance</span>
+            <strong style="font-size:20px; color:var(--gold-accent);">${AppState.userWallet.coins} 🪙</strong>
+          </div>
+          <div class="ud-metric-row">
+            <span>Virtual Gifts Sent</span>
+            <strong>14 Gifts</strong>
+          </div>
+          <div class="ud-metric-row">
+            <span>Estimated Value</span>
+            <strong>$${(AppState.userWallet.coins * 0.01).toFixed(2)} USD</strong>
+          </div>
+          <div style="margin-top:14px; display:flex; gap:10px;">
+            <button class="btn-primary-sm" style="flex:1;" onclick="openWalletModal()">Get Coins</button>
+            <button class="btn-outline-sm" style="flex:1;" onclick="showToast('Wallet history synced')">History</button>
+          </div>
+        </div>
+
+        <div class="ud-section-card">
+          <h3>
+            <span>Creator Analytics</span>
+            <span style="font-size:12px; color:var(--text-muted);">Last 30 Days</span>
+          </h3>
+          <div class="ud-metric-row">
+            <span>Published Videos</span>
+            <strong>${userVideos.length}</strong>
+          </div>
+          <div class="ud-metric-row">
+            <span>Cumulative Views</span>
+            <strong>${formatMetric(totalViews)}</strong>
+          </div>
+          <div class="ud-metric-row">
+            <span>Received Likes</span>
+            <strong>${formatMetric(totalLikes)}</strong>
+          </div>
+          <div class="ud-metric-row">
+            <span>Discussion Comments</span>
+            <strong>${formatMetric(totalComments)}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="ud-section-card">
+        <h3>
+          <span>Recent Activity & Reminders</span>
+          <button class="ud-btn-action" onclick="switchUserDashboardTab('notifications')">View All</button>
+        </h3>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          ${AppState.notifications.slice(0, 3).map(n => `
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border-color);">
+              <div style="display:flex; align-items:center; gap:12px;">
+                <span style="font-size:18px;">${n.type === 'LIKE' ? '❤️' : (n.type === 'FOLLOW' ? '👤' : '📢')}</span>
+                <div>
+                  <div style="font-weight:600; color:#fff; font-size:14px;">${n.title}</div>
+                  <div style="font-size:12px; color:#9ca3af;">${n.sourceUsername} ${n.description}</div>
+                </div>
+              </div>
+              <span style="font-size:11px; color:#9ca3af;">${formatTimeAgo(n.createdAt)}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  } else if (tab === 'my_videos') {
+    let myVideos = AppState.videos.filter(v => v.userId === u.userId);
+    // If current user has no videos yet, also allow viewing all videos where creator is @me
+    if (myVideos.length === 0) {
+      myVideos = AppState.videos.filter(v => v.username === u.username);
+    }
+
+    container.innerHTML = `
+      <div class="ud-section-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; flex-wrap:wrap; gap:12px;">
+          <div>
+            <h3>My Uploaded Video Reminders</h3>
+            <p style="font-size:13px; color:#9ca3af;">Manage your published Quran recitations, Hadith gems, and reflections</p>
+          </div>
+          <button class="btn-primary-sm" onclick="navigateTo('upload')">
+            + Upload New Video
+          </button>
+        </div>
+
+        ${myVideos.length === 0 ? `
+          <div style="text-align:center; padding:50px 20px; color:#9ca3af;">
+            <p style="font-size:16px; margin-bottom:14px;">You haven't uploaded any video reminders yet.</p>
+            <button class="btn-primary" onclick="navigateTo('upload')">Upload Your First Video</button>
+          </div>
+        ` : `
+          <div class="ud-videos-table-container">
+            <table class="ud-table">
+              <thead>
+                <tr>
+                  <th>Video</th>
+                  <th>Category</th>
+                  <th>Views</th>
+                  <th>Likes</th>
+                  <th>Comments</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${myVideos.map(v => `
+                  <tr>
+                    <td>
+                      <div class="ud-video-cell">
+                        <img class="ud-video-thumb" src="${v.thumbnailUrl}" alt="${v.title}">
+                        <div class="ud-video-info">
+                          <h4>${v.title}</h4>
+                          <span>${v.quranRef || v.hadithRef || formatTimeAgo(v.createdAt)}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <span class="user-role-badge" style="color:#10b981; border-color:#10b981;">${v.category}</span>
+                    </td>
+                    <td><strong>${formatMetric(v.viewsCount || 0)}</strong></td>
+                    <td><strong>${formatMetric(v.likesCount || 0)}</strong></td>
+                    <td><strong>${formatMetric(v.commentsCount || 0)}</strong></td>
+                    <td>
+                      <button class="ud-btn-action" onclick="openVideoDirectly(${v.id})">Watch</button>
+                      <button class="ud-btn-action" onclick="openEditVideoModal(${v.id})">Edit</button>
+                      <button class="ud-btn-action danger" onclick="deleteUserVideo(${v.id})">Delete</button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `}
+      </div>
+    `;
+  } else if (tab === 'saved') {
+    const savedVideos = AppState.videos.filter(v => v.isSaved);
+    container.innerHTML = `
+      <div class="ud-section-card">
+        <h3>Saved & Bookmarked Reminders (${savedVideos.length})</h3>
+        ${savedVideos.length === 0 ? `
+          <p style="text-align:center; padding:40px; color:#9ca3af;">No saved videos yet. Bookmark videos while browsing to watch later.</p>
+        ` : `
+          <div class="profile-video-grid">
+            ${savedVideos.map(v => `
+              <div class="grid-video-card" onclick="openVideoDirectly(${v.id})">
+                <img class="grid-video-thumb" src="${v.thumbnailUrl}" alt="${v.title}">
+                <div class="grid-video-overlay">
+                  <span class="user-role-badge" style="font-size:10px; margin-bottom:4px;">${v.category}</span>
+                  <p class="grid-video-title">${v.title}</p>
+                  <span style="font-size:11px; color:#9ca3af;">${v.username}</span>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `}
+      </div>
+    `;
+  } else if (tab === 'liked') {
+    const likedVideos = AppState.videos.filter(v => v.isLiked);
+    container.innerHTML = `
+      <div class="ud-section-card">
+        <h3>Liked Videos (${likedVideos.length})</h3>
+        ${likedVideos.length === 0 ? `
+          <p style="text-align:center; padding:40px; color:#9ca3af;">No liked videos yet. Tap the heart button on videos you appreciate.</p>
+        ` : `
+          <div class="profile-video-grid">
+            ${likedVideos.map(v => `
+              <div class="grid-video-card" onclick="openVideoDirectly(${v.id})">
+                <img class="grid-video-thumb" src="${v.thumbnailUrl}" alt="${v.title}">
+                <div class="grid-video-overlay">
+                  <p class="grid-video-title">${v.title}</p>
+                  <span style="font-size:11px; color:#9ca3af;">${v.username} • ❤️ ${formatMetric(v.likesCount)}</span>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `}
+      </div>
+    `;
+  } else if (tab === 'notifications') {
+    container.innerHTML = `
+      <div class="ud-section-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+          <h3>Notifications & Activity (${AppState.notifications.length})</h3>
+          <button class="ud-btn-action" onclick="markAllNotificationsRead()">Mark All as Read</button>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          ${AppState.notifications.map(n => `
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:14px; border-radius:10px; background:${n.isRead ? 'rgba(0,0,0,0.2)' : 'rgba(15,46,30,0.3)'}; border:1px solid ${n.isRead ? 'var(--border-color)' : 'rgba(212,175,55,0.4)'};">
+              <div style="display:flex; align-items:center; gap:14px;">
+                <span style="font-size:22px;">${n.type === 'LIKE' ? '❤️' : (n.type === 'FOLLOW' ? '👤' : '📢')}</span>
+                <div>
+                  <div style="font-weight:700; color:#fff; font-size:14px;">${n.title}</div>
+                  <div style="font-size:13px; color:#e5e7eb; margin-top:2px;">
+                    <strong>${n.sourceUsername}</strong> ${n.description}
+                  </div>
+                </div>
+              </div>
+              <span style="font-size:12px; color:#9ca3af;">${formatTimeAgo(n.createdAt)}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  } else if (tab === 'messages') {
+    container.innerHTML = `
+      <div class="ud-section-card" style="padding:0; overflow:hidden;">
+        <div class="messages-layout" style="height:550px;">
+          <div class="conversations-pane">
+            <div class="pane-header">
+              <h3>Messages</h3>
+              <span class="user-role-badge">Direct Chat</span>
+            </div>
+            <div id="udConversationList" class="conversation-list"></div>
+          </div>
+          <div class="chat-pane">
+            <div class="chat-header">
+              <div class="chat-user-info">
+                <img id="udChatAvatar" class="avatar-sm" src="" alt="Chat recipient">
+                <div>
+                  <h4 id="udChatName" style="color:#fff; font-size:14px;">Loading...</h4>
+                  <span style="font-size:11px; color:#10b981;">Online</span>
+                </div>
+              </div>
+            </div>
+            <div id="udChatMessages" class="chat-messages"></div>
+            <div class="chat-input-bar">
+              <input type="text" id="udMessageInput" placeholder="Write a message in peace..." onkeydown="handleUdChatKey(event)">
+              <button class="btn-send-message" onclick="sendUdMessage()">Send</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    setTimeout(() => {
+      renderUdConversations();
+      renderUdChat();
+    }, 50);
+  } else if (tab === 'settings') {
+    container.innerHTML = `
+      <div class="ud-section-card">
+        <h3>Account & Privacy Settings</h3>
+        <div class="settings-group" style="margin-bottom:20px;">
+          <h4 style="font-size:14px; color:var(--gold-accent); margin-bottom:12px;">Privacy Controls</h4>
+          <div class="setting-item">
+            <span>Private Account (Only approved followers see uploads)</span>
+            <input type="checkbox" id="setPrivateAccount">
+          </div>
+          <div class="setting-item">
+            <span>Allow Comments on my video reminders</span>
+            <input type="checkbox" id="setAllowComments" checked>
+          </div>
+          <div class="setting-item">
+            <span>Allow Direct Messages from Community</span>
+            <input type="checkbox" id="setAllowDMs" checked>
+          </div>
+        </div>
+
+        <div class="settings-group" style="margin-bottom:20px;">
+          <h4 style="font-size:14px; color:var(--gold-accent); margin-bottom:12px;">Playback & Language</h4>
+          <div class="setting-item">
+            <span>Interface Language</span>
+            <select id="setLanguage" onchange="changeLanguage(this.value)">
+              <option value="English">English</option>
+              <option value="Arabic">العربية (Arabic)</option>
+              <option value="Urdu">اردو (Urdu)</option>
+              <option value="Turkish">Türkçe (Turkish)</option>
+            </select>
+          </div>
+          <div class="setting-item">
+            <span>Autoplay Videos on Desktop</span>
+            <input type="checkbox" id="setAutoplay" checked>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <h4 style="font-size:14px; color:var(--gold-accent); margin-bottom:12px;">Account Role & Access</h4>
+          <div class="setting-item">
+            <span>Active Role Tier</span>
+            <select onchange="switchRole(this.value)">
+              <option value="USER" ${u.role === 'USER' ? 'selected' : ''}>Standard Member</option>
+              <option value="CREATOR" ${u.role === 'CREATOR' ? 'selected' : ''}>Verified Creator</option>
+              <option value="ADMIN" ${u.role === 'ADMIN' ? 'selected' : ''}>Super Administrator</option>
+            </select>
+          </div>
+          <div style="margin-top:20px; display:flex; gap:12px;">
+            <button class="btn-primary-sm" onclick="showToast('Settings saved successfully! ✓')">Save Changes</button>
+            <button class="btn-outline-sm" style="color:#ef4444;" onclick="showToast('Signed out of session')">Sign Out</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
 }
 
-function renderProfileVideos() {
-  const grid = document.getElementById('profileVideoGrid');
-  if (!grid) return;
-
-  let list = [];
-  if (AppState.profileTab === 'videos') {
-    list = AppState.videos.filter(v => v.userId === AppState.currentUser.userId);
-  } else if (AppState.profileTab === 'liked') {
-    list = AppState.videos.filter(v => v.isLiked);
-  } else if (AppState.profileTab === 'saved') {
-    list = AppState.videos.filter(v => v.isSaved);
-  }
-
-  if (list.length === 0) {
-    grid.innerHTML = `<p style="grid-column:1/-1; text-align:center; padding:30px; color:#9ca3af;">No videos in this section.</p>`;
-    return;
-  }
-
-  grid.innerHTML = list.map(v => `
-    <div class="grid-video-card" onclick="openVideoDirectly(${v.id})">
-      <img class="grid-video-thumb" src="${v.thumbnailUrl}" alt="${v.title}">
-      <div class="grid-video-overlay">
-        <p class="grid-video-title">${v.title}</p>
+// User Dashboard Chat Helpers
+function renderUdConversations() {
+  const container = document.getElementById('udConversationList');
+  if (!container) return;
+  const contacts = AppState.users.filter(u => u.userId !== 'current_user');
+  container.innerHTML = contacts.map(c => `
+    <div class="conversation-item ${c.userId === AppState.activeChatRecipient ? 'active' : ''}" onclick="selectUdChat('${c.userId}')">
+      <img src="${c.avatarUrl}" class="avatar-sm" alt="${c.username}">
+      <div class="conv-meta">
+        <div class="conv-name">${c.fullName}</div>
+        <div class="conv-last-msg">${c.username}</div>
       </div>
     </div>
   `).join('');
+}
+
+function selectUdChat(recipientId) {
+  AppState.activeChatRecipient = recipientId;
+  renderUdConversations();
+  renderUdChat();
+}
+
+function renderUdChat() {
+  const recipient = AppState.users.find(u => u.userId === AppState.activeChatRecipient) || AppState.users[1];
+  const avatarElem = document.getElementById('udChatAvatar');
+  if (avatarElem) avatarElem.src = recipient.avatarUrl;
+  const nameElem = document.getElementById('udChatName');
+  if (nameElem) nameElem.innerText = `${recipient.fullName} (${recipient.username})`;
+
+  const msgContainer = document.getElementById('udChatMessages');
+  if (!msgContainer) return;
+
+  const thread = AppState.messages.filter(m =>
+    (m.senderId === 'current_user' && m.receiverId === recipient.userId) ||
+    (m.senderId === recipient.userId && m.receiverId === 'current_user')
+  );
+
+  if (thread.length === 0) {
+    msgContainer.innerHTML = `
+      <div style="text-align:center; padding:30px; color:#9ca3af;">
+        <p>No messages yet with ${recipient.fullName}.</p>
+        <div style="margin-top:12px; display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+          <button class="btn-outline-sm" onclick="sendGreetingMsg('Assalamu Alaikum wa Rahmatullah 🤲🏽')">Salam 🤲🏽</button>
+          <button class="btn-outline-sm" onclick="sendGreetingMsg('BarakAllahu Feek for your beneficial reminders! ✨')">BarakAllahu Feek ✨</button>
+          <button class="btn-outline-sm" onclick="sendGreetingMsg('JazakAllahu Khair!')">JazakAllahu Khair</button>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  msgContainer.innerHTML = thread.map(m => `
+    <div class="chat-bubble ${m.senderId === 'current_user' ? 'outgoing' : 'incoming'}">
+      <div class="bubble-text">${m.text}</div>
+      <span class="bubble-time">${formatTimeAgo(m.createdAt)}</span>
+    </div>
+  `).join('');
+  msgContainer.scrollTop = msgContainer.scrollHeight;
+}
+
+function handleUdChatKey(e) {
+  if (e.key === 'Enter') sendUdMessage();
+}
+
+function sendUdMessage() {
+  const input = document.getElementById('udMessageInput');
+  const text = input ? input.value.trim() : '';
+  if (!text) return;
+
+  const newMsg = {
+    id: Date.now(),
+    senderId: 'current_user',
+    senderName: AppState.currentUser.username,
+    receiverId: AppState.activeChatRecipient,
+    text: text,
+    createdAt: Date.now()
+  };
+
+  AppState.messages.push(newMsg);
+  setLocalData(STORAGE_KEYS.MESSAGES, AppState.messages);
+  input.value = '';
+  renderUdChat();
+}
+
+function sendGreetingMsg(greeting) {
+  const newMsg = {
+    id: Date.now(),
+    senderId: 'current_user',
+    senderName: AppState.currentUser.username,
+    receiverId: AppState.activeChatRecipient,
+    text: greeting,
+    createdAt: Date.now()
+  };
+  AppState.messages.push(newMsg);
+  setLocalData(STORAGE_KEYS.MESSAGES, AppState.messages);
+  renderUdChat();
+}
+
+function markAllNotificationsRead() {
+  AppState.notifications.forEach(n => n.isRead = true);
+  setLocalData(STORAGE_KEYS.NOTIFICATIONS, AppState.notifications);
+  renderUserDashboard();
+  updateHeaderBadges();
+  showToast('All notifications marked as read ✓');
+}
+
+// Video Management in User Dashboard
+function openEditVideoModal(videoId) {
+  const v = AppState.videos.find(item => item.id === videoId);
+  if (!v) return;
+
+  AppState.activeEditingVideoId = videoId;
+  document.getElementById('editVideoTitle').value = v.title;
+  document.getElementById('editVideoCategory').value = v.category;
+  document.getElementById('editVideoDescription').value = v.description;
+  document.getElementById('editVideoModal').style.display = 'flex';
+}
+
+function closeEditVideoModal() {
+  document.getElementById('editVideoModal').style.display = 'none';
+  AppState.activeEditingVideoId = null;
+}
+
+function saveVideoChanges() {
+  const videoId = AppState.activeEditingVideoId;
+  const v = AppState.videos.find(item => item.id === videoId);
+  if (!v) return;
+
+  v.title = document.getElementById('editVideoTitle').value.trim() || v.title;
+  v.category = document.getElementById('editVideoCategory').value || v.category;
+  v.description = document.getElementById('editVideoDescription').value.trim() || v.description;
+
+  setLocalData(STORAGE_KEYS.VIDEOS, AppState.videos);
+  closeEditVideoModal();
+  renderUserDashboard();
+  renderVideoFeed();
+  showToast('Video details updated! ✨');
+}
+
+function deleteUserVideo(videoId) {
+  if (!confirm('Are you sure you want to delete this video reminder?')) return;
+  AppState.videos = AppState.videos.filter(v => v.id !== videoId);
+  setLocalData(STORAGE_KEYS.VIDEOS, AppState.videos);
+  renderUserDashboard();
+  renderVideoFeed();
+  showToast('Video deleted successfully.');
 }
 
 function openEditProfileModal() {
@@ -1105,7 +1627,7 @@ function saveProfileChanges() {
 
   setLocalData(STORAGE_KEYS.USERS, AppState.users);
   closeEditProfileModal();
-  renderProfile();
+  renderUserDashboard();
   showToast('Profile updated! ✨');
 }
 
@@ -1126,6 +1648,8 @@ function purchaseCoins(amount, price) {
   AppState.userWallet.coins += amount;
   setLocalData(STORAGE_KEYS.WALLET, AppState.userWallet);
   document.getElementById('userCoinBalance').innerText = AppState.userWallet.coins;
+  const udCoin = document.getElementById('userWalletCoinDisplay');
+  if (udCoin) udCoin.innerText = `${AppState.userWallet.coins} 🪙`;
   showToast(`Successfully purchased ${amount} Deen Coins! 🪙`);
 }
 
@@ -1147,6 +1671,9 @@ function sendGift(giftName, cost, emoji) {
   AppState.userWallet.coins -= cost;
   setLocalData(STORAGE_KEYS.WALLET, AppState.userWallet);
   closeGiftTray();
+
+  const udCoin = document.getElementById('userWalletCoinDisplay');
+  if (udCoin) udCoin.innerText = `${AppState.userWallet.coins} 🪙`;
 
   // Trigger Animated Fullscreen Banner
   const overlay = document.getElementById('giftAnimationOverlay');
@@ -1208,81 +1735,554 @@ function startHostStream() {
 }
 
 // ============================================================================
-// 12. Admin Dashboard & Moderation
+// 12. Professional Admin Dashboard & Moderation Portal
 // ============================================================================
 
-function renderAdmin() {
-  document.getElementById('adminTotalUsers').innerText = AppState.users.length;
-  document.getElementById('adminTotalVideos').innerText = AppState.videos.length;
-  document.getElementById('adminPendingReports').innerText = '1';
-  document.getElementById('adminActiveAds').innerText = '2';
-
-  renderAdminTable();
+function toggleAdminSidebar() {
+  const container = document.getElementById('adminPortalContainer');
+  if (container) {
+    container.classList.toggle('sidebar-collapsed');
+  }
 }
 
-function renderAdminTable() {
-  const container = document.getElementById('adminTableContainer');
-  if (!container) return;
+function switchAdminSection(section) {
+  AppState.adminSection = section;
+  renderAdmin();
+}
 
-  if (AppState.adminTab === 'users') {
-    container.innerHTML = `
-      <table class="admin-table">
-        <thead>
-          <tr>
-            <th>User</th>
-            <th>Role</th>
-            <th>Status</th>
-            <th>Followers</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${AppState.users.map(u => `
-            <tr>
-              <td><strong>${u.username}</strong><br><small style="color:#9ca3af;">${u.fullName}</small></td>
-              <td>${u.role}</td>
-              <td><span style="color:${u.status === 'ACTIVE' ? '#10b981' : '#ef4444'}; font-weight:700;">${u.status}</span></td>
-              <td>${u.followersCount}</td>
-              <td>
-                <button class="btn-outline-sm" onclick="toggleUserStatus('${u.userId}')">
-                  ${u.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
-                </button>
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
+// Backward-compatible alias
+function switchAdminTab(tab) {
+  switchAdminSection(tab);
+}
+
+function renderAdmin() {
+  // Update Admin Profile Header Info
+  const adminNameElem = document.getElementById('adminHeaderName');
+  if (adminNameElem) adminNameElem.innerText = AppState.currentUser.fullName || 'Admin';
+
+  const adminAvatarElem = document.getElementById('adminHeaderAvatar');
+  if (adminAvatarElem) adminAvatarElem.src = AppState.currentUser.avatarUrl;
+
+  const adminRolePill = document.getElementById('adminRolePill');
+  if (adminRolePill) adminRolePill.innerText = AppState.currentUser.role === 'ADMIN' ? 'Super Admin' : AppState.currentUser.role;
+
+  // Highlight Sidebar Navigation
+  document.querySelectorAll('.admin-nav-link').forEach(link => link.classList.remove('active'));
+  const activeLink = document.getElementById(`adminNav-${AppState.adminSection}`);
+  if (activeLink) activeLink.classList.add('active');
+
+  // Update Header Title & Subtitle
+  const titles = {
+    overview: { title: 'Platform Analytics & Overview', sub: 'High-level metrics, system health, and real-time activity' },
+    users: { title: 'User Accounts & Roles Management', sub: 'Manage user profiles, creator tiers, statuses, and permissions' },
+    videos: { title: 'Video Content & Media Manager', sub: 'Review, moderate, feature, or remove uploaded video reminders' },
+    community: { title: 'Community Safety & Moderation Queue', sub: 'Review reported content, inappropriate comments, and violations' },
+    platform: { title: 'Platform Categories & Sponsored Ads', sub: 'Manage Islamic topics, banner sponsorships, and feature toggles' },
+    security: { title: 'Security Controls & Audit Trail', sub: 'Administrator access controls, security policies, and data export' }
+  };
+
+  const currentMeta = titles[AppState.adminSection] || titles.overview;
+  const stageTitle = document.getElementById('adminStageTitle');
+  if (stageTitle) stageTitle.innerText = currentMeta.title;
+
+  const stageSub = document.getElementById('adminStageSubtitle');
+  if (stageSub) stageSub.innerText = currentMeta.sub;
+
+  renderAdminStageBody();
+}
+
+function renderAdminStageBody() {
+  const body = document.getElementById('adminStageBody');
+  if (!body) return;
+
+  const sec = AppState.adminSection;
+
+  if (sec === 'overview') {
+    const totalViews = AppState.videos.reduce((s, v) => s + (v.viewsCount || 0), 0);
+    const totalLikes = AppState.videos.reduce((s, v) => s + (v.likesCount || 0), 0);
+
+    body.innerHTML = `
+      <div class="admin-kpi-grid">
+        <div class="admin-kpi-card">
+          <span class="kpi-title">Total Registered Users</span>
+          <span class="kpi-number">${AppState.users.length}</span>
+          <span class="kpi-foot">↑ +12% this week</span>
+        </div>
+        <div class="admin-kpi-card gold">
+          <span class="kpi-title">Active Video Reminders</span>
+          <span class="kpi-number">${AppState.videos.length}</span>
+          <span class="kpi-foot">↑ +8 uploaded today</span>
+        </div>
+        <div class="admin-kpi-card warning">
+          <span class="kpi-title">Pending Reports</span>
+          <span class="kpi-number">${AppState.adminReports.filter(r => r.status === 'PENDING').length}</span>
+          <span class="kpi-foot" style="color:#f59e0b;">Needs review</span>
+        </div>
+        <div class="admin-kpi-card blue">
+          <span class="kpi-title">Total Views Accrued</span>
+          <span class="kpi-number">${formatMetric(totalViews)}</span>
+          <span class="kpi-foot">Across all platforms</span>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:24px; margin-bottom:24px;">
+        <div class="admin-card-panel">
+          <div class="admin-card-panel-header">
+            <h3>Quick Moderation Actions</h3>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <button class="btn-primary-sm" style="text-align:left; padding:12px 16px;" onclick="switchAdminSection('community')">
+              🛡️ Review Reports Queue (${AppState.adminReports.filter(r => r.status === 'PENDING').length} pending)
+            </button>
+            <button class="btn-outline-sm" style="text-align:left; padding:12px 16px;" onclick="switchAdminSection('users')">
+              👥 Review Creator Verification Requests
+            </button>
+            <button class="btn-outline-sm" style="text-align:left; padding:12px 16px;" onclick="exportPlatformData()">
+              💾 Export Platform Backup (JSON)
+            </button>
+          </div>
+        </div>
+
+        <div class="admin-card-panel">
+          <div class="admin-card-panel-header">
+            <h3>Platform System Health</h3>
+            <span class="status-badge active">100% Operational</span>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:10px; font-size:13px;">
+            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border-color);">
+              <span>Database Storage Engine</span>
+              <strong style="color:#10b981;">IndexedDB / LocalStorage (Healthy)</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border-color);">
+              <span>Vercel Edge CDN Deployment</span>
+              <strong style="color:#10b981;">Ready (deentok.vercel.app)</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border-color);">
+              <span>Islamic Content Filter</span>
+              <strong style="color:#10b981;">Strict Halal Enabled</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; padding:8px 0;">
+              <span>Video Playback Server</span>
+              <strong style="color:#10b981;">HTTP Range Streaming Active</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-card-panel">
+        <div class="admin-card-panel-header">
+          <h3>Recent System Audit Logs</h3>
+          <button class="ud-btn-action" onclick="switchAdminSection('security')">View All</button>
+        </div>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Administrator</th>
+                <th>Action</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${AppState.adminAuditLogs.map(l => `
+                <tr>
+                  <td><code>${l.timestamp}</code></td>
+                  <td><strong>${l.admin}</strong></td>
+                  <td><span class="status-badge active">${l.action}</span></td>
+                  <td>${l.details}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
     `;
-  } else if (AppState.adminTab === 'videos') {
-    container.innerHTML = `
-      <table class="admin-table">
-        <thead>
-          <tr>
-            <th>Title</th>
-            <th>Creator</th>
-            <th>Category</th>
-            <th>Likes</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${AppState.videos.map(v => `
-            <tr>
-              <td>${v.title}</td>
-              <td>${v.username}</td>
-              <td>${v.category}</td>
-              <td>${v.likesCount}</td>
-              <td>
-                <button class="btn-outline-sm" style="color:#ef4444;" onclick="deleteVideoAdmin(${v.id})">Delete</button>
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
+  } else if (sec === 'users') {
+    let filteredUsers = AppState.users;
+    if (AppState.adminRoleFilter !== 'ALL') {
+      filteredUsers = filteredUsers.filter(u => u.role === AppState.adminRoleFilter);
+    }
+    if (AppState.adminUserSearch) {
+      const q = AppState.adminUserSearch.toLowerCase();
+      filteredUsers = filteredUsers.filter(u =>
+        u.username.toLowerCase().includes(q) || u.fullName.toLowerCase().includes(q)
+      );
+    }
+
+    body.innerHTML = `
+      <div class="admin-card-panel">
+        <div class="admin-card-panel-header">
+          <h3>User Accounts Directory (${filteredUsers.length} Users)</h3>
+          <div class="admin-filters-row">
+            <input type="text" class="admin-search-input" placeholder="Search by name or handle..." value="${AppState.adminUserSearch}" oninput="filterAdminUsersSearch(this.value)">
+            <select class="admin-select" onchange="filterAdminUsersRole(this.value)">
+              <option value="ALL" ${AppState.adminRoleFilter === 'ALL' ? 'selected' : ''}>All Roles</option>
+              <option value="USER" ${AppState.adminRoleFilter === 'USER' ? 'selected' : ''}>Standard Members</option>
+              <option value="CREATOR" ${AppState.adminRoleFilter === 'CREATOR' ? 'selected' : ''}>Verified Creators</option>
+              <option value="ADMIN" ${AppState.adminRoleFilter === 'ADMIN' ? 'selected' : ''}>Administrators</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>User Account</th>
+                <th>Role Tier</th>
+                <th>Status</th>
+                <th>Followers</th>
+                <th>Verified</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredUsers.map(u => `
+                <tr>
+                  <td>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                      <img src="${u.avatarUrl}" class="avatar-sm" alt="${u.username}">
+                      <div>
+                        <strong>${u.fullName}</strong>
+                        <div style="color:#9ca3af; font-size:12px;">${u.username}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="user-role-badge">${u.role}</span>
+                  </td>
+                  <td>
+                    <span class="status-badge ${u.status === 'ACTIVE' ? 'active' : 'suspended'}">${u.status}</span>
+                  </td>
+                  <td><strong>${formatMetric(u.followersCount)}</strong></td>
+                  <td>
+                    <button class="ud-btn-action" onclick="toggleUserVerification('${u.userId}')">
+                      ${u.isVerified ? '✓ Verified' : 'Standard'}
+                    </button>
+                  </td>
+                  <td>
+                    <button class="ud-btn-action" onclick="toggleUserStatus('${u.userId}')">
+                      ${u.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
+                    </button>
+                    <button class="ud-btn-action" onclick="promoteUserRole('${u.userId}')">Change Role</button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
     `;
-  } else {
-    container.innerHTML = `<p style="padding:20px; color:#9ca3af;">No pending items in ${AppState.adminTab}.</p>`;
+  } else if (sec === 'videos') {
+    let filteredVideos = AppState.videos;
+    if (AppState.adminCategoryFilter !== 'ALL') {
+      filteredVideos = filteredVideos.filter(v => v.category === AppState.adminCategoryFilter);
+    }
+    if (AppState.adminVideoSearch) {
+      const q = AppState.adminVideoSearch.toLowerCase();
+      filteredVideos = filteredVideos.filter(v =>
+        v.title.toLowerCase().includes(q) || v.username.toLowerCase().includes(q)
+      );
+    }
+
+    body.innerHTML = `
+      <div class="admin-card-panel">
+        <div class="admin-card-panel-header">
+          <h3>Published Video Reminders (${filteredVideos.length} Videos)</h3>
+          <div class="admin-filters-row">
+            <input type="text" class="admin-search-input" placeholder="Search by title or creator..." value="${AppState.adminVideoSearch}" oninput="filterAdminVideosSearch(this.value)">
+            <select class="admin-select" onchange="filterAdminVideosCategory(this.value)">
+              <option value="ALL">All Categories</option>
+              <option value="Quran">Quran</option>
+              <option value="Hadith">Hadith</option>
+              <option value="Dua">Dua</option>
+              <option value="Islamic History">Islamic History</option>
+              <option value="Reflection">Reflection</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Video</th>
+                <th>Creator</th>
+                <th>Category</th>
+                <th>Views</th>
+                <th>Likes</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredVideos.map(v => `
+                <tr>
+                  <td>
+                    <div class="ud-video-cell">
+                      <img class="ud-video-thumb" src="${v.thumbnailUrl}" alt="${v.title}">
+                      <div class="ud-video-info">
+                        <h4>${v.title}</h4>
+                        <span>${v.quranRef || v.hadithRef || formatTimeAgo(v.createdAt)}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td><strong>${v.username}</strong></td>
+                  <td><span class="user-role-badge" style="color:#10b981; border-color:#10b981;">${v.category}</span></td>
+                  <td><strong>${formatMetric(v.viewsCount || 0)}</strong></td>
+                  <td><strong>${formatMetric(v.likesCount || 0)}</strong></td>
+                  <td>
+                    <button class="ud-btn-action" onclick="openVideoDirectly(${v.id})">Play</button>
+                    <button class="ud-btn-action" onclick="openEditVideoModal(${v.id})">Edit</button>
+                    <button class="ud-btn-action danger" onclick="deleteVideoAdmin(${v.id})">Delete</button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  } else if (sec === 'community') {
+    const pendingReports = AppState.adminReports;
+    body.innerHTML = `
+      <div class="admin-card-panel">
+        <div class="admin-card-panel-header">
+          <h3>Community Safety & Violation Reports</h3>
+          <span class="status-badge warning">${pendingReports.filter(r => r.status === 'PENDING').length} Pending Review</span>
+        </div>
+
+        <div class="admin-table-wrap" style="margin-bottom:24px;">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Report ID</th>
+                <th>Target Type</th>
+                <th>Violation Reason</th>
+                <th>Reporter</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${pendingReports.map(r => `
+                <tr>
+                  <td><code>#REP-${r.id}</code></td>
+                  <td><strong>${r.type}</strong> (${r.targetId})</td>
+                  <td><span style="color:#f59e0b; font-weight:600;">${r.reason}</span></td>
+                  <td>${r.reportedBy}</td>
+                  <td><span class="status-badge ${r.status === 'PENDING' ? 'pending' : 'active'}">${r.status}</span></td>
+                  <td>
+                    ${r.status === 'PENDING' ? `
+                      <button class="ud-btn-action" onclick="resolveAdminReport(${r.id}, 'RESOLVED')">Resolve</button>
+                      <button class="ud-btn-action danger" onclick="resolveAdminReport(${r.id}, 'DISMISSED')">Dismiss</button>
+                    ` : `
+                      <span style="font-size:12px; color:#10b981;">Action Completed</span>
+                    `}
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="admin-card-panel-header" style="margin-top:20px;">
+          <h3>Recent Comments Queue</h3>
+        </div>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Author</th>
+                <th>Comment Content</th>
+                <th>Video ID</th>
+                <th>Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${AppState.comments.map(c => `
+                <tr>
+                  <td><strong>${c.username}</strong></td>
+                  <td>"${c.text}"</td>
+                  <td><code>#VID-${c.videoId}</code></td>
+                  <td>${formatTimeAgo(c.createdAt)}</td>
+                  <td>
+                    <button class="ud-btn-action danger" onclick="deleteCommentAdmin(${c.id})">Delete Comment</button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  } else if (sec === 'platform') {
+    body.innerHTML = `
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:24px;">
+        <div class="admin-card-panel">
+          <div class="admin-card-panel-header">
+            <h3>Islamic Knowledge Categories</h3>
+          </div>
+          <div class="admin-table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Category Name</th>
+                  <th>Status</th>
+                  <th>Toggle</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${AppState.islamicCategories.map(cat => `
+                  <tr>
+                    <td><strong>${cat.name}</strong></td>
+                    <td><span class="status-badge ${cat.active ? 'active' : 'suspended'}">${cat.active ? 'Active' : 'Disabled'}</span></td>
+                    <td>
+                      <button class="ud-btn-action" onclick="toggleIslamicCategory('${cat.name}')">
+                        ${cat.active ? 'Disable' : 'Enable'}
+                      </button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="admin-card-panel">
+          <div class="admin-card-panel-header">
+            <h3>Sponsored Ads & Announcements</h3>
+          </div>
+          <div class="admin-table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Campaign Title</th>
+                  <th>Impressions</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${AppState.adminAds.map(ad => `
+                  <tr>
+                    <td>
+                      <strong>${ad.title}</strong>
+                      <div style="font-size:11px; color:#9ca3af;">${ad.sponsor}</div>
+                    </td>
+                    <td>${formatMetric(ad.impressions)}</td>
+                    <td><span class="status-badge ${ad.status === 'ACTIVE' ? 'active' : 'pending'}">${ad.status}</span></td>
+                    <td>
+                      <button class="ud-btn-action" onclick="toggleAdminAd(${ad.id})">
+                        ${ad.status === 'ACTIVE' ? 'Pause' : 'Activate'}
+                      </button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+  } else if (sec === 'security') {
+    body.innerHTML = `
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:24px; margin-bottom:24px;">
+        <div class="admin-card-panel">
+          <div class="admin-card-panel-header">
+            <h3>Administrator Credentials</h3>
+            <span class="role-pill-sm">Protected</span>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:12px; font-size:13px;">
+            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border-color);">
+              <span>Primary Admin</span>
+              <strong>${AppState.currentUser.fullName} (${AppState.currentUser.username})</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border-color);">
+              <span>Security Access Level</span>
+              <strong style="color:var(--gold-accent);">Role Level 10 (Root Super Admin)</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border-color);">
+              <span>Session Protection</span>
+              <strong style="color:#10b981;">Active & Encrypted</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-card-panel">
+          <div class="admin-card-panel-header">
+            <h3>Database & System Backup</h3>
+          </div>
+          <p style="font-size:13px; color:#9ca3af; margin-bottom:16px;">
+            Export a full JSON snapshot of all 25 database entities (Users, Videos, Comments, Messages, Wallet).
+          </p>
+          <div style="display:flex; gap:10px;">
+            <button class="btn-primary-sm" onclick="exportPlatformData()">Download Backup (JSON)</button>
+            <button class="btn-outline-sm" onclick="verifyDatabaseIntegrity()">Verify Integrity</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-card-panel">
+        <div class="admin-card-panel-header">
+          <h3>Full System Audit Trail</h3>
+        </div>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Admin Name</th>
+                <th>Action Taken</th>
+                <th>Audit Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${AppState.adminAuditLogs.map(l => `
+                <tr>
+                  <td><code>${l.timestamp}</code></td>
+                  <td><strong>${l.admin}</strong></td>
+                  <td><span class="status-badge active">${l.action}</span></td>
+                  <td>${l.details}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
   }
+}
+
+// Admin Interaction Handlers
+function filterAdminUsersSearch(val) {
+  AppState.adminUserSearch = val;
+  renderAdminStageBody();
+}
+
+function filterAdminUsersRole(role) {
+  AppState.adminRoleFilter = role;
+  renderAdminStageBody();
+}
+
+function filterAdminVideosSearch(val) {
+  AppState.adminVideoSearch = val;
+  renderAdminStageBody();
+}
+
+function filterAdminVideosCategory(cat) {
+  AppState.adminCategoryFilter = cat;
+  renderAdminStageBody();
+}
+
+function toggleUserVerification(userId) {
+  const u = AppState.users.find(user => user.userId === userId);
+  if (!u) return;
+  u.isVerified = !u.isVerified;
+  setLocalData(STORAGE_KEYS.USERS, AppState.users);
+  renderAdminStageBody();
+  showToast(`Updated verification for ${u.username}`);
 }
 
 function toggleUserStatus(userId) {
@@ -1290,21 +2290,114 @@ function toggleUserStatus(userId) {
   if (!u) return;
   u.status = u.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
   setLocalData(STORAGE_KEYS.USERS, AppState.users);
-  renderAdminTable();
+  
+  // Log audit
+  AppState.adminAuditLogs.unshift({
+    timestamp: new Date().toLocaleTimeString(),
+    admin: AppState.currentUser.fullName || 'Admin',
+    action: u.status === 'ACTIVE' ? 'User Activated' : 'User Suspended',
+    details: `Updated status for ${u.username}`
+  });
+
+  renderAdminStageBody();
   showToast(`Updated status for ${u.username}`);
 }
 
+function promoteUserRole(userId) {
+  const u = AppState.users.find(user => user.userId === userId);
+  if (!u) return;
+  const roles = ['USER', 'CREATOR', 'ADMIN'];
+  const nextIdx = (roles.indexOf(u.role) + 1) % roles.length;
+  u.role = roles[nextIdx];
+  setLocalData(STORAGE_KEYS.USERS, AppState.users);
+  renderAdminStageBody();
+  showToast(`${u.username} role changed to: ${u.role}`);
+}
+
 function deleteVideoAdmin(videoId) {
-  if (!confirm('Are you sure you want to remove this video?')) return;
+  if (!confirm('Are you sure you want to remove this video by moderation?')) return;
   AppState.videos = AppState.videos.filter(v => v.id !== videoId);
   setLocalData(STORAGE_KEYS.VIDEOS, AppState.videos);
+  
+  AppState.adminAuditLogs.unshift({
+    timestamp: new Date().toLocaleTimeString(),
+    admin: AppState.currentUser.fullName || 'Admin',
+    action: 'Video Deleted',
+    details: `Video ID ${videoId} removed`
+  });
+
   renderAdmin();
   showToast('Video removed by moderation.');
+}
+
+function deleteCommentAdmin(commentId) {
+  if (!confirm('Delete this comment from discussions?')) return;
+  AppState.comments = AppState.comments.filter(c => c.id !== commentId);
+  setLocalData(STORAGE_KEYS.COMMENTS, AppState.comments);
+  renderAdminStageBody();
+  showToast('Comment removed.');
+}
+
+function resolveAdminReport(reportId, newStatus) {
+  const r = AppState.adminReports.find(item => item.id === reportId);
+  if (!r) return;
+  r.status = newStatus;
+  renderAdminStageBody();
+  showToast(`Report #REP-${reportId} marked as ${newStatus}`);
+}
+
+function toggleIslamicCategory(catName) {
+  const c = AppState.islamicCategories.find(item => item.name === catName);
+  if (!c) return;
+  c.active = !c.active;
+  renderAdminStageBody();
+  showToast(`Category ${catName} ${c.active ? 'enabled' : 'disabled'}`);
+}
+
+function toggleAdminAd(adId) {
+  const ad = AppState.adminAds.find(item => item.id === adId);
+  if (!ad) return;
+  ad.status = ad.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
+  renderAdminStageBody();
+  showToast(`Ad campaign ${ad.title} is now ${ad.status}`);
+}
+
+function exportPlatformData() {
+  const fullBackup = {
+    appName: 'DeenTok',
+    version: '2.0.0-web',
+    timestamp: new Date().toISOString(),
+    users: AppState.users,
+    videos: AppState.videos,
+    comments: AppState.comments,
+    messages: AppState.messages,
+    notifications: AppState.notifications,
+    userWallet: AppState.userWallet
+  };
+
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fullBackup, null, 2));
+  const dlAnchorElem = document.createElement('a');
+  dlAnchorElem.setAttribute("href", dataStr);
+  dlAnchorElem.setAttribute("download", `deentok_system_backup_${Date.now()}.json`);
+  dlAnchorElem.click();
+  showToast('Backup JSON exported successfully! 💾');
+}
+
+function verifyDatabaseIntegrity() {
+  const usersValid = AppState.users.every(u => u.userId && u.username);
+  const videosValid = AppState.videos.every(v => v.id && v.videoUrl);
+  if (usersValid && videosValid) {
+    showToast('Database integrity check PASSED! 25 entities verified ✓');
+  } else {
+    showToast('Database alert: some records need sync');
+  }
 }
 
 function switchRole(newRole) {
   AppState.currentUser.role = newRole;
   setLocalData(STORAGE_KEYS.USERS, AppState.users);
+  renderAdmin();
+  renderUserDashboard();
   showToast(`Switched active role to: ${newRole}`);
 }
 

@@ -1,0 +1,22 @@
+{
+  "name": "deentok",
+  "version": "1.0.0",
+  "description": "DeenTok - Responsive Islamic Video Sharing Platform",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "build": "echo 'Build static site complete'",
+    "lint": "node -c server.js && node -c app.js"
+  },
+  "keywords": [
+    "deentok",
+    "video-sharing",
+    "islamic-reminders",
+    "responsive-web"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
